@@ -86,7 +86,7 @@
       <div class="ctl"><div class="ctl-l">Page</div><div class="seg" data-key="page">
         <button data-v="light">Clair</button><button data-v="dark">Sombre</button></div></div>
       <div class="ctl"><div class="ctl-l">Couleurs des cartes (<code>theme</code>)</div><div class="seg" data-key="theme">
-        <button data-v="maison">Pastel (suit votre thème)</button><button data-v="v2">MyElectricalData</button><button data-v="auto">MyElectricalData auto</button><button data-v="ha">Thème Home Assistant</button></div></div>
+        <button data-v="v2">MyElectricalData</button><button data-v="maison">Pastel (suit votre thème)</button><button data-v="auto">MyElectricalData auto</button><button data-v="ha">Thème Home Assistant</button></div></div>
       <div class="ctl"><div class="ctl-l">Largeur</div><div class="seg" data-key="width">
         <button data-v="mobile">Téléphone</button><button data-v="large">Tablette / PC</button></div></div>
 
@@ -145,7 +145,7 @@
     thermique: { cards: [{ type: "custom:voiture-thermique-card" }] },
     batteries: { cards: [{ type: "custom:voiture-batteries-card" }] },
   };
-  const defaults = { card: "thermique", page: "dark", theme: "maison", width: "mobile", charging: "on" };
+  const defaults = { card: "thermique", page: "dark", theme: "v2", width: "mobile", charging: "on" };
   let state = { ...defaults };
   try { state = { ...defaults, ...JSON.parse(localStorage.getItem("voitures-demo") || "{}") }; } catch (e) { /* stockage indisponible */ }
   if (!CASES[state.card]) state.card = defaults.card;
@@ -209,7 +209,7 @@
     document.querySelectorAll("[data-for]").forEach((el) => { el.hidden = !el.dataset.for.split(" ").includes(state.card); });
     const cs = CASES[state.card];
     const cards = cs.cards.map((c) => ({ ...c, theme: state.theme }));
-    const shown = cards.map((c) => { const x = { ...c }; if (x.theme === "maison") delete x.theme; return x; });
+    const shown = cards.map((c) => { const x = { ...c }; if (x.theme === "v2") delete x.theme; return x; });
     document.getElementById("yaml").textContent = shown.length === 1
       ? yaml(shown[0]).replace(/^\n/, "")
       : `type: vertical-stack\ncards:${yaml(shown, 2)}`;

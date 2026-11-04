@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.1.0-beta.1";
+const CARD_VERSION = "0.1.0-beta.2";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -331,14 +331,14 @@ ha-card.th-maison.dark {
   --m-purple: var(--active-purple, #a98be6); --m-brown: var(--active-brown, #a77a55); --m-acc: var(--pop, #f0a274);
 }
 ha-card.th-v2 {
-  --m-card: #1f2a3c; --m-chip: #2c3a52; --m-text: #e7edf5; --m-faint: #5d6e88; --m-pop: #1d93e3; --m-on-pop: #ffffff;
-  --m-green: #78b81a; --m-orange: #e8962e; --m-red: #e04848; --m-yellow: #e2c33c; --m-blue: #3f7ff0; --m-blue-dark: #2b56a8;
-  --m-purple: #8c6be0; --m-brown: #a77a55; --m-acc: #4fb0f0;
+  --m-card: #1a2434; --m-chip: #212d40; --m-text: #e7edf5; --m-faint: #5d6e88; --m-pop: #1d93e3; --m-on-pop: #ffffff;
+  --m-green: #5fcf8a; --m-orange: #f0a33a; --m-red: #ee4a4a; --m-yellow: #f7c948; --m-blue: #1d93e3; --m-blue-dark: #2b56a8;
+  --m-purple: #8c6be0; --m-brown: #a77a55; --m-acc: #1d93e3; --m-lime: #96d21f;
   border: 1px solid #2f3d55; --m-radius: 18px;
 }
 ha-card.th-v2.light {
   --m-card: #ffffff; --m-chip: #eef2f7; --m-text: #1a2434; --m-faint: #a3afc0; --m-pop: #1673b8; --m-on-pop: #ffffff;
-  --m-green: #5c9c12; --m-orange: #d98420; --m-red: #d23c3c; --m-yellow: #d2b22a; --m-blue: #2f6fe0; --m-blue-dark: #24508f; --m-acc: #1673b8;
+  --m-green: #1d8a4b; --m-orange: #b0640a; --m-red: #c62f2f; --m-yellow: #8a6500; --m-blue: #1673b8; --m-blue-dark: #24508f; --m-acc: #1673b8; --m-lime: #4c8a0b;
   border-color: #dbe2ec; box-shadow: 0 1px 3px rgba(26, 36, 52, .08);
 }
 ha-card.th-ha {
@@ -734,6 +734,131 @@ const DEVICE_STYLE = `
 .btn.off { background: var(--m-chip); color: var(--m-muted); opacity: .55; pointer-events: none; }
 `;
 
+/* ======================================================= cadrans du tableau de bord */
+
+// Arc de 270° (de 135° à 405°, sens horaire) : 0 en bas à gauche, maximum en bas à droite.
+const gPt = (r, a) => [60 + r * Math.cos((a * Math.PI) / 180), 60 + r * Math.sin((a * Math.PI) / 180)];
+const gArc = (r, a0, a1) => {
+  const [x0, y0] = gPt(r, a0), [x1, y1] = gPt(r, a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+};
+const clamp01 = (x) => (x === null || !Number.isFinite(x) ? null : Math.max(0, Math.min(1, x)));
+/** Couleurs des cadrans : uniquement des variables du thème (jamais une valeur de capteur). */
+const G_COLORS = { blue: "var(--m-pop)", green: "var(--m-green)", lime: "var(--m-lime, var(--m-green))", orange: "var(--m-orange)", red: "var(--m-red)", faint: "var(--m-faint)", yellow: "var(--m-yellow)" };
+
+/**
+ * Cadran : arc de fond, zone rouge facultative, arc de valeur, graduations et aiguille facultatives.
+ * frac, red (zone haute) et low (zone basse) sont des fractions (0 à 1) ; color est une clé de G_COLORS.
+ */
+function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = false } = {}) {
+  const f = clamp01(frac);
+  const r = 48, a = (x) => 135 + 270 * x;
+  let out = `<svg class="vd-arc" viewBox="0 0 120 104" aria-hidden="true"><path class="vd-trk" d="${gArc(r, 135, 405)}"/>`;
+  if (red !== null) out += `<path class="vd-red" d="${gArc(r, a(clamp01(red)), 405)}"/>`;
+  if (low !== null && clamp01(low) > 0) out += `<path class="vd-red" d="${gArc(r, 135, a(clamp01(low)))}"/>`;
+  if (f !== null && f > 0.004) out += `<path class="vd-val" style="stroke:${G_COLORS[color] || G_COLORS.blue}" d="${gArc(r, 135, a(f))}"/>`;
+  for (let i = 0; i <= ticks; i++) {
+    if (!ticks) break;
+    const [x0, y0] = gPt(r - 9, a(i / ticks)), [x1, y1] = gPt(r - (i % 2 ? 12 : 15), a(i / ticks));
+    out += `<line class="vd-tick${i % 2 ? "" : " maj"}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"/>`;
+  }
+  if (needle && f !== null) {
+    const [x, y] = gPt(r - 16, a(f));
+    out += `<line class="vd-ndl" x1="60" y1="60" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}"/><circle class="vd-hub" cx="60" cy="60" r="4.5"/>`;
+  }
+  return `${out}</svg>`;
+}
+
+/** Cadran avec sa valeur au centre et son libellé : value et unit arrivent déjà formatés et échappés. */
+const dialHtml = (card, { label, value, unit = "", frac, color = "blue", id = null, big = false, ticks = 0, red = null, low = null, needle = false, sub = "" }) =>
+  `<div class="vd-g${big ? " big" : ""}"${id ? card._click({ action: "more-info", entity: id }, null, label) : ""}>` +
+  `<div class="vd-gw">${gaugeSvg(frac, color, { ticks, red, low, needle })}<div class="vd-gv${needle ? " low" : ""}"><b>${value}</b>${unit ? `<span>${unit}</span>` : ""}${sub ? `<small>${sub}</small>` : ""}</div></div>` +
+  `<div class="vd-gl">${label}</div></div>`;
+
+/** Pastille d'information sous le tableau de bord. */
+const pillHtml = (card, icon, text, id, cls = "") =>
+  `<span class="vd-pill${cls ? ` ${cls}` : ""}"${id ? card._click({ action: "more-info", entity: id }, null, text.replace(/<[^>]+>/g, "")) : ""}><ha-icon icon="${icon}"></ha-icon>${text}</span>`;
+
+/** En-tête d'un véhicule : icône, nom, sous-titre, état à droite. */
+const carHead = (icon, name, sub, state, stateCls, extra = "") =>
+  `<div class="vd-h"><div class="vd-ic ${stateCls}"><ha-icon icon="${icon}"></ha-icon></div><div class="vd-t"><div class="vd-n">${name}</div><div class="vd-s">${sub}</div></div>` +
+  `${state ? `<span class="vd-st ${stateCls}"><i></i>${state}</span>` : ""}${extra}</div>`;
+
+const DASH_STYLE = `
+.vd { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.vd-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vd-top > ha-icon { --mdc-icon-size: 30px; color: var(--m-acc); flex: none; }
+.vd-top .vd-t { flex: 1; min-width: 0; }
+.vd-ttl { font-size: 1.15rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-sub { font-size: .78rem; color: var(--m-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-sum { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@container (max-width: 480px) { .vd-top:has(.vd-sum) { flex-wrap: wrap; } .vd-sum { flex-basis: 100%; justify-content: flex-start; } }
+.vd-car { border: 1px solid var(--m-line); background: var(--m-chip); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.vd-car.alert { border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); }
+.vd-car.live { border-color: color-mix(in srgb, var(--m-pop) 55%, transparent); }
+.vd-cars { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+.vd-car.open { grid-column: 1 / -1; }
+.vd-h { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vd-h[data-a] { cursor: pointer; }
+.vd-ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--m-text) 7%, transparent); }
+.vd-ic ha-icon { --mdc-icon-size: 24px; color: var(--m-muted); }
+.vd-ic.live ha-icon, .vd-ic.ch ha-icon { color: var(--m-pop); }
+.vd-ic.ok ha-icon { color: var(--m-green); }
+.vd-ic.alert ha-icon { color: var(--m-red); }
+.vd-t { flex: 1; min-width: 0; }
+.vd-n { font-weight: 700; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-s { font-size: .76rem; color: var(--m-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-st { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: .76rem; font-weight: 600; white-space: nowrap; flex: none;
+  border: 1px solid var(--m-line); background: color-mix(in srgb, var(--m-text) 4%, transparent); }
+.vd-st i { width: 8px; height: 8px; border-radius: 50%; background: var(--m-faint); }
+.vd-st.live i, .vd-st.ch i { background: var(--m-pop); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-pop) 25%, transparent); }
+.vd-st.ok i { background: var(--m-green); }
+.vd-st.alert { border-color: var(--m-red); color: var(--m-red); } .vd-st.alert i { background: var(--m-red); }
+.vd-st.warn i { background: var(--m-orange); }
+.vd-more { --mdc-icon-size: 20px; color: var(--m-muted); flex: none; }
+/* tableau de bord : un grand cadran et des petits à côté */
+.vd-dash { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+.vd-dash.solo { grid-template-columns: 1fr; }
+.vd-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+@container (max-width: 340px) { .vd-dash { grid-template-columns: 1fr; } .vd-side { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.vd-g { display: flex; flex-direction: column; align-items: center; min-width: 0; border-radius: 12px; padding: 2px 0 4px; }
+.vd-g[data-a]:hover { background: color-mix(in srgb, var(--m-text) 4%, transparent); }
+.vd-gw { position: relative; width: 100%; max-width: 92px; }
+.vd-g.big .vd-gw { max-width: 190px; }
+.vd-arc { display: block; width: 100%; height: auto; overflow: visible; }
+.vd-trk { fill: none; stroke: var(--m-line); stroke-width: 8; stroke-linecap: round; }
+.vd-red { fill: none; stroke: color-mix(in srgb, var(--m-red) 45%, transparent); stroke-width: 8; stroke-linecap: butt; }
+.vd-val { fill: none; stroke-width: 8; stroke-linecap: round; transition: d .6s ease; }
+.vd-g.big .vd-trk, .vd-g.big .vd-red, .vd-g.big .vd-val { stroke-width: 7; }
+.vd-tick { stroke: var(--m-muted); stroke-width: 1; opacity: .55; }
+.vd-tick.maj { stroke-width: 1.6; opacity: .9; }
+.vd-ndl { stroke: var(--m-text); stroke-width: 2.4; stroke-linecap: round; }
+.vd-hub { fill: var(--m-text); }
+.vd-gv { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 6%; line-height: 1.05; text-align: center; }
+.vd-gv.low { justify-content: flex-end; padding: 0 0 4%; }
+.vd-gv b { font-size: 1.05rem; font-weight: 700; white-space: nowrap; }
+.vd-g.big .vd-gv b { font-size: 2.1rem; }
+.vd-gv span { font-size: .66rem; color: var(--m-muted); font-weight: 600; }
+.vd-g.big .vd-gv span { font-size: .8rem; }
+.vd-gv small { font-size: .72rem; color: var(--m-muted); margin-top: 2px; white-space: nowrap; }
+.vd-gl { font-size: .72rem; color: var(--m-muted); margin-top: -4px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.vd-g.big .vd-gl { font-size: .8rem; margin-top: -10px; }
+/* compteurs du trajet : chiffres façon afficheur */
+.vd-trip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; }
+.vd-k { border-radius: 10px; padding: 8px 10px; background: var(--m-card); border: 1px solid var(--m-line); min-width: 0; }
+.vd-k small { display: block; font-size: .7rem; color: var(--m-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vd-k b { font-size: 1.05rem; font-weight: 700; white-space: nowrap; }
+.vd-k b span { font-size: .7em; color: var(--m-muted); margin-left: 2px; font-weight: 600; }
+.vd-k[data-a] { cursor: pointer; }
+.vd-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.vd-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; background: var(--m-card); border: 1px solid var(--m-line); font-size: .76rem; font-weight: 600; white-space: nowrap; }
+.vd-pill ha-icon { --mdc-icon-size: 16px; color: var(--m-muted); }
+.vd-pill.warn { border-color: var(--m-orange); } .vd-pill.warn ha-icon { color: var(--m-orange); }
+.vd-pill.alert { border-color: var(--m-red); color: var(--m-red); } .vd-pill.alert ha-icon { color: var(--m-red); }
+.vd-pill.odo { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.vd-none { font-size: .82rem; color: var(--m-muted); padding: 2px; }
+`;
+
 const levelBar = (v, hi = 60, lo = 35) => (v === null ? null : v >= hi ? "var(--m-green)" : v <= lo ? "var(--m-pop)" : "var(--m-orange)");
 
 /* ================================================================ voiture */
@@ -741,7 +866,7 @@ const levelBar = (v, hi = 60, lo = 35) => (v === null ? null : v >= hi ? "var(--
 const CAR_PLATFORMS = ["tesla_fleet", "teslemetry", "tessie", "tesla_custom", "tesla"];
 
 class MaisonVoitureCard extends MaisonCard {
-  static get DEFAULTS() { return { theme: "maison", icon: "mdi:car-electric" }; }
+  static get DEFAULTS() { return { theme: "v2", icon: "mdi:car-electric" }; }
 
   _resolve(c, hass) {
     let anchor = c.battery || null;
@@ -751,7 +876,7 @@ class MaisonVoitureCard extends MaisonCard {
     const pool = anchor || c.prefix ? poolOf(hass, anchor, c.prefix) : [];
     const f = (k, dom, re, not) => (c[k] !== undefined ? c[k] : pick(pool, dom, re, not));
     return {
-      battery: f("battery", "sensor", /battery_level|_battery$|batterie|_soc$|state_of_charge/, /range|temp|voltage/),
+      battery: c.battery !== undefined ? c.battery : anchor || pick(pool, "sensor", /battery_level|_battery$|batterie|_soc$|state_of_charge/, /range|temp|voltage/),
       range: f("range", "sensor", /range|autonomie/, /ideal|est_|target/),
       odometer: f("odometer", "sensor", /odometer|kilometrage|mileage|odometre/),
       charging: c.charging !== undefined ? c.charging : pick(pool, "binary_sensor", /charging$|en_charge$|is_charging/) || pick(pool, "sensor", /charging_state|charging_status|charge_state|etat_de_charge/),
@@ -796,12 +921,18 @@ class MaisonVoitureCard extends MaisonCard {
     const odo = num(st[r.odometer]?.state);
     const ch = this._chargeText(r, hass);
     const lim = num(st[r.limit]?.state);
-    const tiles = [
-      r.battery ? tileHtml("Batterie", fmt(bat), "%", bat, levelBar(bat), this._click({ action: "more-info", entity: r.battery })) : "",
-      r.range ? tileHtml("Autonomie", fmt(rng), esc(st[r.range]?.attributes?.unit_of_measurement || "km"), bat, levelBar(bat), this._click({ action: "more-info", entity: r.range })) : "",
-      r.odometer ? tileHtml("Kilométrage", fmt(odo), esc(st[r.odometer]?.attributes?.unit_of_measurement || "km"), null, null, this._click({ action: "more-info", entity: r.odometer })) : "",
-      tileHtml("Charge", `<small class="ch${ch.on ? " on" : ""}">${esc(ch.txt)}</small>`, "", lim !== null ? lim : null, "var(--m-faint)", r.switch ? this._click({ action: "toggle", entity: r.switch }, { action: "more-info", entity: r.switch }, "Démarrer / arrêter la charge") : r.charging ? this._click({ action: "more-info", entity: r.charging }) : ""),
-    ].join("");
+    const pw = num(r.power ? st[r.power]?.state : null);
+    const pwU = r.power ? st[r.power]?.attributes?.unit_of_measurement || "kW" : "kW";
+    const pwKw = pw === null ? null : /^w$/i.test(pwU) ? pw / 1000 : pw;
+    const rngU = esc(st[r.range]?.attributes?.unit_of_measurement || "km");
+    const batColor = bat === null ? "faint" : ch.on ? "blue" : bat <= 20 ? "red" : bat <= 40 ? "orange" : "green";
+    const big = dialHtml(this, { label: lim !== null ? `Batterie · limite ${fmt(lim)} %` : "Batterie", value: bat !== null ? fmt(bat) : "—", unit: "%",
+      sub: rng !== null ? `${fmt(rng)} ${rngU}` : "", frac: bat === null ? null : bat / 100, color: batColor, big: true, ticks: 10, low: 0.2, id: r.battery || r.range });
+    const side = [
+      rng !== null ? dialHtml(this, { label: "Autonomie", value: fmt(rng), unit: rngU, frac: bat === null ? null : bat / 100, color: batColor, id: r.range }) : "",
+      pwKw !== null && ch.on ? dialHtml(this, { label: "Puissance", value: fmt(pwKw, pwKw < 10 ? 1 : 0), unit: "kW", frac: pwKw / Math.max(11, num(c.max_power) || 11), color: "blue", id: r.power }) : "",
+      lim !== null ? dialHtml(this, { label: "Limite de charge", value: fmt(lim), unit: "%", frac: lim / 100, color: "faint", id: r.limit }) : "",
+    ].filter(Boolean).join("");
     let clim = "";
     const cl = r.climate ? st[r.climate] : null;
     if (cl) {
@@ -810,7 +941,7 @@ class MaisonVoitureCard extends MaisonCard {
       const inside = num(r.inside ? st[r.inside]?.state : cl.attributes?.current_temperature);
       const step = num(cl.attributes?.target_temp_step) || 0.5;
       const set = (v) => ({ action: "perform-action", perform_action: "climate.set_temperature", target: { entity_id: r.climate }, data: { temperature: v } });
-      clim = `<div class="cl"><div class="cl-t"${this._click({ action: "more-info", entity: r.climate }, null, "Climatisation")}><span class="vt2-l">Climatisation · intérieur ${fmt(inside, 1)} °C</span>` +
+      clim = `<div class="cl"><div class="cl-t"${this._click({ action: "more-info", entity: r.climate }, null, "Climatisation")}><small>Climatisation · intérieur ${fmt(inside, 1)} °C</small>` +
         `<span class="cl-v">${on ? `${fmt(t, 1)}<span>°C</span>` : "Arrêtée"}</span></div><div class="rbar">` +
         `${on && t !== null ? `<span class="rb"${this._click(set(t - step), null, "Moins")}><ha-icon icon="mdi:minus"></ha-icon></span><span class="rb"${this._click(set(t + step), null, "Plus")}><ha-icon icon="mdi:plus"></ha-icon></span>` : ""}` +
         `<span class="rb${on ? " on" : ""}"${this._click({ action: "perform-action", perform_action: on ? "climate.turn_off" : "climate.turn_on", target: { entity_id: r.climate } }, null, on ? "Arrêter" : "Démarrer")}><ha-icon icon="mdi:fan"></ha-icon></span></div></div>`;
@@ -820,26 +951,33 @@ class MaisonVoitureCard extends MaisonCard {
     if (lk) {
       const locked = lk.state === "locked";
       const pending = this._ui.confirm?.endsWith?.(r.lock);
-      lock = `<span class="rb${locked ? "" : " warn"}"${this._click({ action: "toggle", entity: r.lock, confirm: locked }, { action: "more-info", entity: r.lock }, locked ? "Déverrouiller (deux clics)" : "Verrouiller")} title="${locked ? "Verrouillée" : "Déverrouillée"}"><ha-icon icon="${pending ? "mdi:lock-question" : locked ? "mdi:lock" : "mdi:lock-open-variant"}"></ha-icon></span>`;
+      lock = `<span class="rb vd-lock${locked ? "" : " warn"}"${this._click({ action: "toggle", entity: r.lock, confirm: locked }, { action: "more-info", entity: r.lock }, locked ? "Déverrouiller (deux clics)" : "Verrouiller")} title="${locked ? "Verrouillée" : "Déverrouillée"}"><ha-icon icon="${pending ? "mdi:lock-question" : locked ? "mdi:lock" : "mdi:lock-open-variant"}"></ha-icon></span>`;
     }
     const loc = r.location ? st[r.location] : null;
     const where = loc ? (loc.state === "home" ? "À la maison" : loc.state === "not_home" ? "En déplacement" : stateFr(loc.state)) : "";
-    return `<div class="dv"><div class="dv-h"><div class="dv-ic"><ha-icon icon="${esc(c.icon)}"></ha-icon></div>` +
-      `<div class="dv-t"><div class="dv-n">${tpl(c.name ?? "Voiture", hass)}</div><div class="dv-s">${esc([ch.txt, where].filter(Boolean).join(" · "))}</div></div>${lock}</div>` +
-      `<div class="dv-g car">${tiles}</div>${clim}</div>`;
+    const chargeAct = r.switch ? this._click({ action: "toggle", entity: r.switch }, { action: "more-info", entity: r.switch }, "Démarrer / arrêter la charge") : r.charging ? this._click({ action: "more-info", entity: r.charging }, null, "Charge") : "";
+    const pills = [
+      `<span class="vd-pill${ch.on ? " on" : ""}"${chargeAct}><ha-icon icon="${ch.on ? "mdi:ev-station" : "mdi:power-plug-outline"}"></ha-icon>${esc(ch.txt)}</span>`,
+      odo !== null ? pillHtml(this, "mdi:counter", `${fmt(odo)} ${esc(st[r.odometer]?.attributes?.unit_of_measurement || "km")}`, r.odometer, "odo") : "",
+    ].join("");
+    const stCls = ch.on ? "ch" : bat !== null && bat <= 20 ? "alert" : "ok";
+    return `<div class="vd">${carHead(esc(c.icon), tpl(c.name ?? "Voiture", hass), esc(where || ch.txt), ch.on ? "En charge" : bat !== null && bat <= 20 ? "Batterie faible" : "Prête", stCls, lock)}` +
+      `<div class="vd-dash${side ? "" : " solo"}">${big}${side ? `<div class="vd-side ev">${side}</div>` : ""}</div><div class="vd-pills">${pills}</div>${clim}</div>`;
   }
 
   getCardSize() { return 5; }
 }
-MaisonVoitureCard.STYLE = `<style>${DEVICE_STYLE}
-.dv-g.car { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@container (min-width: 560px) { .dv-g.car { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.ch { font-size: .62em; font-weight: 500; white-space: normal; display: block; line-height: 1.25; }
-.ch.on { color: var(--m-acc); font-weight: 700; }
-.dv-h .rb { flex: none; width: 44px; }
-.cl { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 10px 10px 14px; border-radius: 16px; background: var(--m-chip); }
+MaisonVoitureCard.STYLE = `<style>${DASH_STYLE}
+.vd-side.ev { grid-template-columns: 1fr; }
+@container (max-width: 340px) { .vd-side.ev { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.vd-pill.on { border-color: var(--m-pop); color: var(--m-pop); } .vd-pill.on ha-icon { color: var(--m-pop); }
+.vd-pill[data-a] { cursor: pointer; }
+.vd-lock { flex: none; width: 40px; height: 40px; background: var(--m-chip); border: 1px solid var(--m-line); }
+.vd-lock.warn { background: var(--m-red); color: #fff; border-color: var(--m-red); }
+.cl { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 14px; background: var(--m-chip); border: 1px solid var(--m-line); }
 .cl-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.cl-v { font-size: 1.5rem; font-weight: 300; }
+.cl-t small { font-size: .74rem; color: var(--m-muted); }
+.cl-v { font-size: 1.5rem; font-weight: 700; }
 .cl-v span { font-size: .55em; margin-left: 2px; color: var(--m-muted); }
 .cl .rbar { background: var(--m-card); flex: none; }
 .cl .rb { width: 40px; height: 40px; flex: none; }
@@ -886,7 +1024,7 @@ const BM_FR = {
 const BM_STATES = /^(charging|discharging|resting|idle|static|cranking)$/;
 
 class MaisonBatteriesCard extends MaisonCard {
-  static get DEFAULTS() { return { theme: "maison", title: "Batteries voitures", volt_warn: 12.3, volt_alert: 12, hours: 48, stale_hours: 3, show_curve: true }; }
+  static get DEFAULTS() { return { theme: "v2", title: "Batteries voitures", volt_warn: 12.3, volt_alert: 12, hours: 48, stale_hours: 3, show_curve: true }; }
 
   /** Un appareil par batterie ; rôles d'après la classe du capteur, l'identifiant et la valeur (entités renommées comprises). */
   _resolve(c, hass) {
@@ -979,31 +1117,37 @@ class MaisonBatteriesCard extends MaisonCard {
         ].filter(([, , x]) => x !== null && x !== undefined && x !== "");
         detail = `<div class="tel-d">${rows.map(([ic, l, x, id]) => `<div class="tel-r"${this._click({ action: "more-info", entity: id }, null, l)}><ha-icon icon="${ic}"></ha-icon><span>${l}</span><b>${esc(x)}</b></div>`).join("")}</div>`;
       }
-      return `<div class="tel bat${isOpen ? " open" : ""}${level === "alert" && !away ? " low" : ""}${away ? " muted" : ""}">
-        <div class="tel-h"${this._click({ action: "ui", set: { bat: isOpen ? null : d.id } }, { action: "more-info", entity: r.volt || r.pct }, d.name)}>
-          <div class="tel-ic${charging ? " ch" : ""}"><ha-icon icon="mdi:car-battery" style="color:${color}"></ha-icon>${charging ? `<ha-icon class="tel-bolt" icon="mdi:lightning-bolt"></ha-icon>` : ""}</div>
-          <div class="tel-t"><div class="tel-n">${esc(d.name)}</div><div class="tel-s">${esc(sub)}</div></div>
-          <div class="tel-b bat-v" style="${lowV ? `color:${color}` : ""}">${v === null ? "—" : `${fmt(v, 2)}<span>V</span>`}</div>
-        </div>
-        ${pct !== null ? `<div class="bat-p"><div class="bar-p tel-bar"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${color}"></i></div><span>${fmt(pct)} %</span></div>` : ""}
-        ${graph}
+      const vColor = away ? "faint" : level === "alert" ? "red" : level === "warn" || cond === "low_voltage" ? "orange" : charging ? "blue" : "green";
+      const gauge = dialHtml(this, { label: pct !== null ? `${fmt(pct)} %` : "Tension", value: v === null ? "—" : fmt(v, 2), unit: "V",
+        frac: v === null ? null : (v - 11) / 3.8, color: vColor, low: (alert - 11) / 3.8 });
+      const head = carHead(charging ? "mdi:car-battery" : "mdi:car-battery", esc(d.name), esc(sub), away ? "Hors de portée" : level === "alert" ? "Critique" : lowV ? "Basse" : charging ? "En charge" : "Bonne",
+        away ? "" : level === "alert" ? "alert" : lowV ? "warn" : charging ? "ch" : "ok",
+        `<ha-icon class="vd-more" icon="${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`)
+        .replace('<div class="vd-h">', `<div class="vd-h"${this._click({ action: "ui", set: { bat: isOpen ? null : d.id } }, { action: "more-info", entity: r.volt || r.pct }, d.name)}>`);
+      return `<div class="vd-car bat${isOpen ? " open" : ""}${level === "alert" && !away ? " alert" : ""}${away ? " muted" : ""}">${head}
+        <div class="vd-bat">${gauge}${graph || (pct !== null ? `<div class="bat-p"><div class="bar-p"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${G_COLORS[vColor]}"></i></div></div>` : "")}</div>
         ${detail}
       </div>`;
     }).join("");
-    const sum = [lowN ? `<span class="chipx warn">${lowN} tension basse</span>` : "", awayN ? `<span class="chipx">${awayN} hors de portée</span>` : ""].join("");
-    return `<div class="dv"><div class="dv-h"><div class="dv-ic"><ha-icon icon="${esc(c.icon || "mdi:car-battery")}"></ha-icon></div>` +
-      `<div class="dv-t"><div class="dv-n">${tpl(c.title ?? "Batteries voitures", hass)}</div><div class="dv-s">${list.length} batterie${list.length > 1 ? "s" : ""} 12 V</div></div>${sum ? `<div class="tel-sum">${sum}</div>` : ""}</div>` +
-      `<div class="tel-g">${tiles}</div></div>`;
+    const sum = [lowN ? `<span class="vd-st alert"><i></i>${lowN} tension basse</span>` : "", awayN ? `<span class="vd-st"><i></i>${awayN} hors de portée</span>` : ""].join("");
+    return `<div class="vd"><div class="vd-top"><ha-icon icon="${esc(c.icon || "mdi:car-battery")}"></ha-icon><div class="vd-t"><div class="vd-ttl">${tpl(c.title ?? "Batteries voitures", hass)}</div>` +
+      `<div class="vd-sub">${list.length} batterie${list.length > 1 ? "s" : ""} 12 V</div></div>${sum ? `<div class="vd-sum">${sum}</div>` : ""}</div>` +
+      `<div class="vd-cars">${tiles}</div></div>`;
   }
 
   getCardSize() { return 4; }
 }
-MaisonBatteriesCard.STYLE = TEL_STYLE + `<style>
-.bat-v { font-variant-numeric: tabular-nums; }
-.bat-p { display: flex; align-items: center; gap: 8px; } .bat-p .bar-p { flex: 1; } .bat-p span { font-size: .78rem; color: var(--m-muted); font-weight: 600; min-width: 36px; text-align: right; }
-.bat-g { height: 64px; display: grid; grid-template-rows: 46px auto; }
-.bat-gl { display: flex; justify-content: space-between; font-size: .7rem; color: var(--m-muted); }
-.bat.muted .bat-g, .bat.muted .bat-p { opacity: .5; }
+MaisonBatteriesCard.STYLE = TEL_STYLE + `<style>${DASH_STYLE}
+.vd-bat { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; align-items: center; }
+.vd-bat .vd-gw { max-width: 104px; }
+.vd-bat .vd-gv b { font-size: 1.15rem; }
+.bat-p .bar-p { height: 8px; }
+.bat-g { height: 72px; display: grid; grid-template-rows: 52px auto; min-width: 0; }
+.bat-gl { display: flex; justify-content: space-between; gap: 6px; font-size: .7rem; color: var(--m-muted); }
+.bat-gl span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vd-car.muted .vd-bat { opacity: .5; }
+.vd-st.warn { border-color: var(--m-orange); }
+.tel-d { border-top: 1px solid var(--m-line); }
 </style>`;
 
 /* ================================================ voitures thermiques (Torque) */
@@ -1030,7 +1174,7 @@ const tqPid = (p) => {
 };
 
 class MaisonTorqueCard extends MaisonCard {
-  static get DEFAULTS() { return { theme: "maison", title: "Voitures", show_battery: true, show_location: true }; }
+  static get DEFAULTS() { return { theme: "v2", title: "Voitures", show_battery: true, show_location: true, max_speed: 200, max_rpm: 7000 }; }
 
   _resolve(c, hass) {
     const reg = hass.entities || {}, devs = hass.devices || {};
@@ -1085,7 +1229,9 @@ class MaisonTorqueCard extends MaisonCard {
     const st = hass.states;
     const val = (id) => { const s = id ? st[id]?.state : undefined; return s === undefined || BAD.has(s) ? null : s; };
     const n = (id) => num(val(id));
+    const pos = (id) => { const x = n(id); return x ? x : null; };
     const open = this._ui.car;
+    const maxSpeed = Math.max(60, num(c.max_speed) || 200), maxRpm = Math.max(2000, num(c.max_rpm) || 7000);
     let driving = 0, mil = 0;
     const cars = list.map((d) => {
       const r = d.roles;
@@ -1101,34 +1247,40 @@ class MaisonTorqueCard extends MaisonCard {
       const conn = r.connected ? st[r.connected] : null;
       const tripAt = conn && conn.state === "off" && !/^1970/.test(conn.last_changed || "") ? conn.last_changed
         : r.trip_km && st[r.trip_km] ? st[r.trip_km].last_changed : null;
-      const sub = live ? ["En route", where].filter(Boolean).join(" · ")
+      const sub = live ? [where, n(r.l100) !== null ? `${fmt(n(r.l100), 1)} L/100` : null].filter(Boolean).join(" · ")
         : [where, tripAt ? `dernier trajet ${relTime(tripAt)}` : null].filter(Boolean).join(" · ");
-      const tile = (l, v, u, id, cls = "") => v === null ? "" : `<div class="vt2 ${cls}"${this._click({ action: "more-info", entity: id }, null, l)}><div class="vt2-l">${l}</div><div class="vt2-v">${v}${u ? `<span>${u}</span>` : ""}</div></div>`;
+      const k = (l, v, u, id) => (v === null ? "" : `<div class="vd-k"${this._click({ action: "more-info", entity: id }, null, l)}><small>${l}</small><b>${v}${u ? `<span>${u}</span>` : ""}</b></div>`);
+      const cool = n(r.coolant), oil = n(r.oil), boost = n(r.boost), gear = n(r.gear);
+      const temp = (x, hot) => (x === null ? "faint" : x >= hot ? "red" : x < 60 ? "blue" : "green");
       let main;
       if (live) {
-        const cool = n(r.coolant);
-        const oil = n(r.oil), boost = n(r.boost), gear = n(r.gear);
-        main = `<div class="dv-g">${tile("Vitesse", n(r.speed) !== null ? fmt(n(r.speed)) : n(r.gps_speed) !== null ? fmt(n(r.gps_speed)) : null, "km/h", r.speed || r.gps_speed)}${tile("Régime", n(r.rpm) !== null ? fmt(n(r.rpm)) : null, "tr/min", r.rpm)}` +
-          `${tile("Liquide de refroidissement", cool !== null ? fmt(cool) : null, "°C", r.coolant, cool !== null && cool >= 105 ? "tq-hot" : "")}${tile("Consommation", n(r.l100) !== null ? fmt(n(r.l100), 1) : null, "L/100", r.l100)}` +
-          `${tile("Huile", oil !== null ? fmt(oil) : null, "°C", r.oil, oil !== null && oil >= 130 ? "tq-hot" : "")}${tile("Turbo", boost !== null ? fmt(boost) : null, "mbar", r.boost)}${tile("Rapport", gear !== null ? (gear ? fmt(gear) : "N") : null, "", r.gear)}</div>`;
+        const spd = n(r.speed) ?? n(r.gps_speed), rpm = n(r.rpm);
+        const side = [
+          dialHtml(this, { label: "Régime", value: rpm !== null ? fmt(rpm / 1000, 1) : "—", unit: "×1000", frac: rpm === null ? null : rpm / maxRpm, color: rpm !== null && rpm > maxRpm * 0.75 ? "orange" : "lime", red: 0.8, id: r.rpm }),
+          dialHtml(this, { label: "Liquide", value: cool !== null ? fmt(cool) : "—", unit: "°C", frac: cool === null ? null : (cool - 40) / 90, color: temp(cool, 105), red: 65 / 90, id: r.coolant }),
+          oil !== null ? dialHtml(this, { label: "Huile", value: fmt(oil), unit: "°C", frac: (oil - 40) / 110, color: temp(oil, 130), red: 90 / 110, id: r.oil }) : "",
+          boost !== null ? dialHtml(this, { label: "Turbo", value: fmt(boost), unit: "mbar", frac: boost / 2500, color: "blue", id: r.boost })
+            : n(r.fuel) !== null ? dialHtml(this, { label: "Carburant", value: fmt(n(r.fuel)), unit: "%", frac: n(r.fuel) / 100, color: n(r.fuel) < 15 ? "red" : "blue", id: r.fuel })
+              : n(r.l100) !== null ? dialHtml(this, { label: "Consommation", value: fmt(n(r.l100), 1), unit: "L/100", frac: n(r.l100) / 20, color: n(r.l100) > 12 ? "orange" : "green", id: r.l100 }) : "",
+        ].filter(Boolean).join("");
+        main = `<div class="vd-dash">${dialHtml(this, { label: gear !== null ? `Rapport ${gear ? fmt(gear) : "N"}` : "Vitesse", value: spd !== null ? fmt(spd) : "—", unit: "km/h", frac: spd === null ? null : spd / maxSpeed, color: "blue", big: true, ticks: 10, needle: true, id: r.speed || r.gps_speed })}<div class="vd-side">${side}</div></div>`;
       } else {
         // valeurs du trajet : Torque les remet à zéro en se reconnectant sans rouler, les zéros sont masqués
-        const pos = (id) => { const x = n(id); return x ? x : null; };
         const mov = pos(r.trip_moving) ?? pos(r.trip_time);
         const km = pos(r.trip_km);
-        const tiles = `${tile("Dernier trajet", km !== null ? fmt(km, 1) : null, "km", r.trip_km)}${tile("Durée", mov !== null ? hm(mov / 60) : null, "", r.trip_moving || r.trip_time)}` +
-          `${tile("Vitesse moyenne", pos(r.trip_avg) !== null ? fmt(pos(r.trip_avg)) : null, "km/h", r.trip_avg)}${km !== null && pos(r.trip_l100) !== null ? tile("Consommation", fmt(pos(r.trip_l100), 1), "L/100", r.trip_l100) : ""}`;
-        main = tiles ? `<div class="dv-g">${tiles}</div>` : `<div class="tq-none">Aucun trajet en mémoire : il s'affichera après le prochain parcours.</div>`;
+        const trip = `${k("Dernier trajet", km !== null ? fmt(km, 1) : null, "km", r.trip_km)}${k("Durée", mov !== null ? hm(mov / 60) : null, "", r.trip_moving || r.trip_time)}` +
+          `${k("Vitesse moy.", pos(r.trip_avg) !== null ? fmt(pos(r.trip_avg)) : null, "km/h", r.trip_avg)}${km !== null && pos(r.trip_l100) !== null ? k("Consommation", fmt(pos(r.trip_l100), 1), "L/100", r.trip_l100) : ""}`;
+        main = trip ? `<div class="vd-trip">${trip}</div>` : `<div class="vd-none">Aucun trajet en mémoire : il s'affichera après le prochain parcours.</div>`;
       }
       const bat = c.show_battery !== false ? n(r.battery) : null;
-      const pos0 = (id) => { const x = n(id); return x ? x : null; };
-      const chips = [
-        milKm ? `<span class="chipx warn"${this._click({ action: "more-info", entity: r.mil_km }, null, "Voyant moteur")}>Voyant moteur · ${fmt(milKm)} km</span>` : "",
-        bat !== null ? `<span class="chipx${bat < 12 ? " warn" : ""}"${this._click({ action: "more-info", entity: r.battery }, null, "Batterie")}>Batterie ${fmt(bat, 2)} V</span>` : "",
-        n(r.fuel) !== null ? `<span class="chipx"${this._click({ action: "more-info", entity: r.fuel }, null, "Carburant")}>Carburant ${fmt(n(r.fuel))} %</span>` : n(r.tank) !== null ? `<span class="chipx"${this._click({ action: "more-info", entity: r.tank }, null, "Carburant")}>Réservoir ${fmt(n(r.tank))} ${esc(st[r.tank].attributes.unit_of_measurement || "")}</span>` : "",
-        !live && n(r.oil) !== null ? `<span class="chipx"${this._click({ action: "more-info", entity: r.oil }, null, "Huile au dernier trajet")}>Huile ${fmt(n(r.oil))} °C (dernier trajet)</span>` : "",
-        n(r.odometer) !== null ? `<span class="chipx"${this._click({ action: "more-info", entity: r.odometer }, null, "Kilométrage")}>${fmt(n(r.odometer))} km</span>` : "",
-        pos0(r.l100_long) !== null && !live ? `<span class="chipx"${this._click({ action: "more-info", entity: r.l100_long }, null, "Moyenne")}>Moyenne ${fmt(n(r.l100_long), 1)} L/100</span>` : "",
+      const pills = [
+        milKm ? pillHtml(this, "mdi:engine-outline", `Voyant moteur · ${fmt(milKm)} km`, r.mil_km, "alert") : "",
+        bat !== null ? pillHtml(this, "mdi:car-battery", `${fmt(bat, 2)} V`, r.battery, bat < 12 ? "alert" : bat < 12.3 ? "warn" : "") : "",
+        !live && n(r.fuel) !== null ? pillHtml(this, "mdi:gas-station", `${fmt(n(r.fuel))} %`, r.fuel, n(r.fuel) < 15 ? "warn" : "")
+          : n(r.tank) !== null ? pillHtml(this, "mdi:gas-station", `${fmt(n(r.tank))} ${esc(st[r.tank].attributes.unit_of_measurement || "")}`, r.tank) : "",
+        !live && oil !== null ? pillHtml(this, "mdi:oil-temperature", `Huile ${fmt(oil)} °C`, r.oil) : "",
+        !live && pos(r.l100_long) !== null ? pillHtml(this, "mdi:chart-line", `Moyenne ${fmt(n(r.l100_long), 1)} L/100`, r.l100_long) : "",
+        n(r.odometer) !== null ? pillHtml(this, "mdi:counter", `${fmt(n(r.odometer))} km`, r.odometer, "odo") : "",
       ].filter(Boolean).join("");
       const isOpen = open === d.id;
       let detail = "";
@@ -1144,39 +1296,24 @@ class MaisonTorqueCard extends MaisonCard {
         }).filter(Boolean).sort((a, b) => a[0].localeCompare(b[0], "fr"));
         detail = `<div class="tel-d">${rows.map(([l, v, id]) => `<div class="tel-r"${this._click({ action: "more-info", entity: id }, null, l)}><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
       }
-      return `<div class="tel tq${isOpen ? " open" : ""}${milKm ? " low" : ""}">
-        <div class="tel-h"${this._click({ action: "ui", set: { car: isOpen ? null : d.id } }, { action: "more-info", entity: r.connected || r.tracker }, d.name)}>
-          <div class="tel-ic${live ? " ch" : ""}"><ha-icon icon="${live ? "mdi:car-sports" : "mdi:car"}"></ha-icon></div>
-          <div class="tel-t"><div class="tel-n">${esc(d.name)}</div><div class="tel-s">${esc(sub || "Pas encore de trajet")}</div></div>
-          ${live ? `<span class="chipx on">En route</span>` : ""}
-          <ha-icon class="tq-more" icon="${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>
-        </div>
-        ${main}
-        ${chips ? `<div class="tq-chips">${chips}</div>` : ""}
-        ${detail}
-      </div>`;
+      const stCls = milKm ? "alert" : live ? "live" : "ok";
+      const head = carHead(live ? "mdi:car-sports" : "mdi:car", esc(d.name), esc(sub || "Pas encore de trajet"), milKm ? "Voyant" : live ? "En route" : "Garée", stCls,
+        `<ha-icon class="vd-more" icon="${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`)
+        .replace('<div class="vd-h">', `<div class="vd-h"${this._click({ action: "ui", set: { car: isOpen ? null : d.id } }, { action: "more-info", entity: r.connected || r.tracker }, d.name)}>`);
+      return `<div class="vd-car${isOpen ? " open" : ""}${milKm ? " alert" : live ? " live" : ""}">${head}${main}${pills ? `<div class="vd-pills">${pills}</div>` : ""}${detail}</div>`;
     }).join("");
-    const sum = [driving ? `<span class="chipx on">${driving} en route</span>` : "", mil ? `<span class="chipx warn">${mil} voyant moteur</span>` : ""].join("");
-    return `<div class="dv"><div class="dv-h"><div class="dv-ic"><ha-icon icon="${esc(c.icon || "mdi:car-multiple")}"></ha-icon></div>` +
-      `<div class="dv-t"><div class="dv-n">${tpl(c.title ?? "Voitures", hass)}</div><div class="dv-s">${list.length} véhicule${list.length > 1 ? "s" : ""} · Torque OBD-II</div></div>${sum ? `<div class="tel-sum">${sum}</div>` : ""}</div>` +
-      `<div class="tel-g tq-g">${cars}</div></div>`;
+    const sum = [driving ? `<span class="vd-st live"><i></i>${driving} en route</span>` : "", mil ? `<span class="vd-st alert"><i></i>${mil} voyant moteur</span>` : ""].join("");
+    return `<div class="vd"><div class="vd-top"><ha-icon icon="${esc(c.icon || "mdi:car-multiple")}"></ha-icon><div class="vd-t"><div class="vd-ttl">${tpl(c.title ?? "Voitures", hass)}</div>` +
+      `<div class="vd-sub">${list.length} véhicule${list.length > 1 ? "s" : ""} · Torque OBD-II</div></div>${sum ? `<div class="vd-sum">${sum}</div>` : ""}</div>` +
+      `<div class="vd-cars">${cars}</div></div>`;
   }
 
   getCardSize() { return 5; }
 }
-MaisonTorqueCard.STYLE = TEL_STYLE + `<style>
-.tq-g { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-.tq .dv-g { grid-template-columns: repeat(2, 1fr); }
-.tq .vt2 { background: var(--m-card); padding: 10px 12px 8px; }
-.tq .vt2-v { font-size: 1.35rem; }
-.tq .vt2.tq-hot .vt2-v { color: var(--m-red); font-weight: 500; }
-.tq-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.tq-chips .chipx { background: var(--m-card); font-size: .76rem; padding: 5px 10px; }
-.tq-chips .chipx.warn { background: var(--m-red); color: var(--m-on-pop); }
-.tq-none { font-size: .82rem; color: var(--m-muted); padding: 4px 2px; }
-.tq-more { --mdc-icon-size: 20px; color: var(--m-muted); flex: none; }
-.tq .tel-r span { color: var(--m-text); }
-.tq .tel-r b { color: var(--m-muted); font-weight: 500; }
+MaisonTorqueCard.STYLE = TEL_STYLE + `<style>${DASH_STYLE}
+.tel-d { border-top: 1px solid var(--m-line); }
+.tel-r span { color: var(--m-text); }
+.tel-r b { color: var(--m-muted); font-weight: 500; }
 </style>`;
 
 /* ================================================================ éditeurs */

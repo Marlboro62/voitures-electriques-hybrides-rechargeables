@@ -77,8 +77,8 @@ Toutes les cartes acceptent `theme` :
 
 | Valeur | Rendu |
 | --- | --- |
-| `maison` (défaut) | **Suit votre thème Home Assistant** (clair ou sombre), avec des touches de couleur pastel |
-| `v2` | Style MyElectricalData bleu nuit |
+| `v2` (défaut) | Style MyElectricalData bleu nuit, comme les autres cartes |
+| `maison` | Suit votre thème Home Assistant (clair ou sombre), avec des touches de couleur pastel |
 | `auto` | Style MyElectricalData, clair ou sombre selon Home Assistant |
 | `ha` | Couleurs du thème Home Assistant |
 
