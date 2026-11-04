@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.1.0-beta.3";
+const CARD_VERSION = "0.1.0-beta.4";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -856,6 +856,7 @@ const DASH_STYLE = `
 .vd-pill.warn { border-color: var(--m-orange); } .vd-pill.warn ha-icon { color: var(--m-orange); }
 .vd-pill.alert { border-color: var(--m-red); color: var(--m-red); } .vd-pill.alert ha-icon { color: var(--m-red); }
 .vd-pill.odo { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.vd-pill.off { color: var(--m-muted); font-weight: 500; }
 .vd-none { font-size: .82rem; color: var(--m-muted); padding: 2px; }
 `;
 
@@ -1207,22 +1208,26 @@ class MaisonTorqueCard extends MaisonCard {
     for (const d of Object.values(map)) for (const [k, id] of Object.entries(d.fallback || {})) d.roles[k] ||= id;
     // batterie BM6 au nom du véhicule (« Batterie Renault » pour « Renault »)
     const bm = Object.entries(reg).filter(([id, e]) => ["bm6", "bm2", "bm7"].includes(e.platform) && hass.states[id]?.attributes?.device_class === "voltage");
+    // un boîtier a deux capteurs de tension (mesurée et corrigée) : celui qui a une valeur, la tension corrigée d'abord
+    const bestOf = (rows) => {
+      const ids = rows.map(([id]) => id).sort((a, b) => Number(/corrig|corrected/.test(b)) - Number(/corrig|corrected/.test(a)));
+      return ids.find((id) => num(hass.states[id]?.state) !== null) || ids[0] || null;
+    };
     // batteries choisies à la main : { Mercedes: "Batterie SLK" } (nom de l'appareil BM6) ou { Mercedes: sensor.… } (capteur de tension)
     const chosen = Object.fromEntries(Object.entries(c.batteries && typeof c.batteries === "object" ? c.batteries : {}).map(([k, v]) => [String(k).toLowerCase(), String(v)]));
     for (const d of Object.values(map)) {
       const want = chosen[d.name.toLowerCase()];
       if (want) {
-        const byName = bm.find(([, e]) => String(devs[e.device_id]?.name_by_user || devs[e.device_id]?.name || "").toLowerCase() === want.toLowerCase());
-        const id = hass.states[want] ? want : byName?.[0];
+        const id = hass.states[want] ? want : bestOf(bm.filter(([, e]) => String(devs[e.device_id]?.name_by_user || devs[e.device_id]?.name || "").toLowerCase() === want.toLowerCase()));
         if (id) { d.roles.battery = id; continue; }
       }
       // « Batterie Renault » ↔ « Renault Laguna » : le nom de la batterie sans « Batterie » doit figurer dans celui de la voiture, ou l'inverse
       const car = d.name.toLowerCase();
-      const hit = bm.find(([, e]) => {
+      const hit = bestOf(bm.filter(([, e]) => {
         const n = String(devs[e.device_id]?.name_by_user || devs[e.device_id]?.name || "").toLowerCase().replace(/\bbatterie\b|\bbattery\b/g, "").trim();
         return n && (car.includes(n) || n.includes(car));
-      });
-      if (hit) d.roles.battery = hit[0];
+      }));
+      if (hit) d.roles.battery = hit;
     }
     const list = Object.values(map);
     list.sort((a, b) => (only.length ? only.indexOf(a.name.toLowerCase()) - only.indexOf(b.name.toLowerCase()) : 0) || a.name.localeCompare(b.name, "fr", { numeric: true }));
@@ -1287,7 +1292,8 @@ class MaisonTorqueCard extends MaisonCard {
       const bat = c.show_battery !== false ? n(r.battery) : null;
       const pills = [
         milKm ? pillHtml(this, "mdi:engine-outline", `Voyant moteur · ${fmt(milKm)} km`, r.mil_km, "alert") : "",
-        bat !== null ? pillHtml(this, "mdi:car-battery", `${fmt(bat, 2)} V`, r.battery, bat < 12 ? "alert" : bat < 12.3 ? "warn" : "") : "",
+        bat !== null ? pillHtml(this, "mdi:car-battery", `${fmt(bat, 2)} V`, r.battery, bat < 12 ? "alert" : bat < 12.3 ? "warn" : "")
+          : c.show_battery !== false && r.battery ? pillHtml(this, "mdi:car-battery-off", "Batterie hors de portée", r.battery, "off") : "",
         !live && n(r.fuel) !== null ? pillHtml(this, "mdi:gas-station", `${fmt(n(r.fuel))} %`, r.fuel, n(r.fuel) < 15 ? "warn" : "")
           : n(r.tank) !== null ? pillHtml(this, "mdi:gas-station", `${fmt(n(r.tank))} ${esc(st[r.tank].attributes.unit_of_measurement || "")}`, r.tank) : "",
         !live && oil !== null ? pillHtml(this, "mdi:oil-temperature", `Huile ${fmt(oil)} °C`, r.oil) : "",
