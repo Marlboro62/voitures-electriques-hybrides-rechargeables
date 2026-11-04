@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.2.0-beta.3";
+const CARD_VERSION = "0.2.0-beta.4";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -827,7 +827,8 @@ const DASH_STYLE = `
 .vd-car { border: 1px solid var(--m-line); background: var(--m-chip); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .vd-car.alert { border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); }
 .vd-car.live { border-color: color-mix(in srgb, var(--m-pop) 55%, transparent); }
-.vd-cars { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+.vd-cars { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 10px; }
+.vd-car { container: vdcar / inline-size; }
 .vd-car.open { grid-column: 1 / -1; }
 .vd-h { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .vd-h[data-a] { cursor: pointer; }
@@ -856,6 +857,9 @@ const DASH_STYLE = `
 .vd-g[data-a]:hover { background: color-mix(in srgb, var(--m-text) 4%, transparent); }
 .vd-gw { position: relative; width: 100%; max-width: 92px; }
 .vd-g.big .vd-gw { max-width: 190px; }
+@container vdcar (min-width: 560px) { .vd-gw { max-width: 125px; } .vd-g.big .vd-gw { max-width: 250px; } }
+@container vdcar (min-width: 860px) { .vd-gw { max-width: 165px; } .vd-g.big .vd-gw { max-width: 340px; } }
+@container vdcar (min-width: 1250px) { .vd-gw { max-width: 205px; } .vd-g.big .vd-gw { max-width: 430px; } }
 .vd-arc { display: block; width: 100%; height: auto; overflow: visible; }
 .vd-trk { fill: none; stroke: var(--m-line); stroke-width: 8; stroke-linecap: round; }
 .vd-red { fill: none; stroke: color-mix(in srgb, var(--m-red) 45%, transparent); stroke-width: 8; stroke-linecap: butt; }
@@ -903,20 +907,22 @@ ha-card.th-obd .vd-on { fill: var(--m-lcd); font-size: 6.8px; font-style: italic
 ha-card.th-obd .vd-led { fill: var(--m-green); filter: drop-shadow(0 0 2px var(--m-green)); }
 ha-card.th-obd { --m-lcd-font: "DS-Digital", "Digital-7", "Orbitron", "Share Tech Mono", ui-monospace, "Consolas", monospace; }
 ha-card.th-obd .vd-gv, ha-card.th-obd .vd-gv.low { justify-content: center; padding: 6% 0 0; color: var(--m-lcd); font-family: var(--m-lcd-font); text-shadow: 0 0 6px rgba(76, 195, 255, .55); }
-ha-card.th-obd .vd-gv b { font-style: italic; font-weight: 600; letter-spacing: .02em; font-size: 1rem; }
-ha-card.th-obd .vd-g.big .vd-gv b { font-size: 1.6rem; }
+ha-card.th-obd .vd-gv b { font-style: italic; font-weight: 600; letter-spacing: .02em; font-size: max(.95rem, 19cqi); }
+ha-card.th-obd .vd-g.big .vd-gv span { font-size: max(.75rem, 6cqi); }
+ha-card.th-obd .vd-g[data-a]:hover { background: none; }
+ha-card.th-obd .vd-g.big .vd-gv b { font-size: max(1.6rem, 14.5cqi); }
 ha-card.th-obd .vd-g.big .vd-gv { padding-top: 10%; line-height: 1; }
-ha-card.th-obd .vd-g { container-type: inline-size; }
+ha-card.th-obd .vd-g, ha-card.th-obd .vd-gw { container-type: inline-size; }
 ha-card.th-obd .vd-in { r: 25.5px; }
-@container (max-width: 120px) { ha-card.th-obd .vd-in { r: 30px; } ha-card.th-obd .vd-on { display: none; } ha-card.th-obd .vd-gt { display: none !important; } ha-card.th-obd .vd-gv { padding-top: 10%; } ha-card.th-obd .vd-gv b { font-size: .9rem; } ha-card.th-obd .vd-gt { font-size: .48rem; } }
-ha-card.th-obd .vd-gv span, ha-card.th-obd .vd-gv small { color: var(--m-lcd); font-style: italic; text-transform: uppercase; }
-ha-card.th-obd .vd-gt { display: block; font-style: italic; font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-ha-card.th-obd .vd-g.big .vd-gt { font-size: .56rem; max-width: 34%; }
+@container (max-width: 160px) { ha-card.th-obd .vd-in { r: 30px; } ha-card.th-obd .vd-on { display: none; } ha-card.th-obd .vd-gt { display: none !important; } ha-card.th-obd .vd-gv { padding-top: 10%; } }
+ha-card.th-obd .vd-gv span, ha-card.th-obd .vd-gv small { font-size: 6.5cqi; color: var(--m-lcd); font-style: italic; text-transform: uppercase; }
+ha-card.th-obd .vd-gt { display: block; font-style: italic; font-size: 5cqi; text-transform: uppercase; letter-spacing: .04em; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ha-card.th-obd .vd-g.big .vd-gt { font-size: max(.56rem, 4.8cqi); max-width: 34%; }
 ha-card.th-obd .vd-g:not(.big) .vd-gt { max-width: 50%; }
 ha-card.th-obd .vd-gl { display: none; }
-ha-card.th-obd .vd-g:not(.big) .vd-gl { display: block; margin-top: 5px; color: var(--m-lcd); font-family: var(--m-lcd-font); font-style: italic; text-transform: uppercase; font-size: .62rem; }
+ha-card.th-obd .vd-g:not(.big) .vd-gl { display: block; margin-top: 5px; color: var(--m-lcd); font-family: var(--m-lcd-font); font-style: italic; text-transform: uppercase; font-size: clamp(.68rem, 9cqi, 1.15rem); }
 ha-card.th-obd .vd-g:not(.big) .vd-gt { display: none; }
-ha-card.th-obd .vd-g:not(.big) .vd-gv span { font-size: .5rem; }
+ha-card.th-obd .vd-g:not(.big) .vd-gv span { font-size: max(.5rem, 10cqi); }
 ha-card.th-obd .vd-car { background: linear-gradient(180deg, #0d1115, #07090b); border-color: #1d242d; }
 ha-card.th-obd .vd-k, ha-card.th-obd .vd-pill { background: #07090c; border-color: #1d242d; }
 ha-card.th-obd .vd-k b { color: var(--m-lcd); font-family: var(--m-lcd-font); font-style: italic; text-shadow: 0 0 6px rgba(76, 195, 255, .45); }
