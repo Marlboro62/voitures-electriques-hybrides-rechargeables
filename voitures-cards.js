@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.2.0-beta.5";
+const CARD_VERSION = "0.2.0-beta.6";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -651,7 +651,7 @@ const THEME_SELECT = {
 };
 
 /** Éditeur : formulaire Home Assistant. Les options absentes du formulaire (listes en YAML) sont conservées. */
-function makeEditor(schema, labels, defaults, helper) {
+function makeEditor(schema, labels, defaults, helper, hooks = {}) {
   return class extends HTMLElement {
     setConfig(config) {
       this._config = { ...config };
@@ -674,9 +674,10 @@ function makeEditor(schema, labels, defaults, helper) {
           this.appendChild(p);
         }
         this._form = document.createElement("ha-form");
-        this._form.computeLabel = (s) => labels[s.name] || s.name;
+        this._form.computeLabel = (s) => s.label || labels[s.name] || s.name;
         this._form.addEventListener("value-changed", (ev) => {
-          const v = { ...this._config, ...ev.detail.value };
+          let v = { ...this._config, ...ev.detail.value };
+          if (hooks.fromForm) v = hooks.fromForm(v, this._config, this._hass);
           for (const k of Object.keys(v)) {
             if (v[k] === "" || v[k] === undefined || (k in defaults && v[k] === defaults[k] && !(k in this._config))) delete v[k];
           }
@@ -686,8 +687,8 @@ function makeEditor(schema, labels, defaults, helper) {
         this.appendChild(this._form);
       }
       this._form.hass = this._hass;
-      this._form.schema = typeof schema === "function" ? schema(this._config) : schema;
-      this._form.data = { ...defaults, ...this._config };
+      this._form.schema = typeof schema === "function" ? schema(this._config, this._hass) : schema;
+      this._form.data = { ...defaults, ...this._config, ...(hooks.toForm ? hooks.toForm(this._config, this._hass) : {}) };
     }
   };
 }
@@ -1315,7 +1316,7 @@ class MaisonTorqueCard extends MaisonCard {
           : d.all.find((x) => tqPid(hass.states[x]?.attributes?.pid) === tqPid(low))
           || d.all.find((x) => String(hass.states[x]?.attributes?.friendly_name || "").toLowerCase().includes(low));
         if (!id || isGps(id) || TQ_PRIVATE.has(tqPid(hass.states[id]?.attributes?.pid))) continue;
-        d.extras.push({ id, name: it.name, min: num(it.min), max: num(it.max), decimals: num(it.decimals), icon: it.icon, when: String(it.when || "always").toLowerCase() });
+        d.extras.push({ id, name: it.name, min: num(it.min), max: num(it.max), gauge: it.gauge === true, decimals: num(it.decimals), icon: it.icon, when: String(it.when || "always").toLowerCase() });
       }
     }
     const list = Object.values(map);
@@ -1434,8 +1435,11 @@ class MaisonTorqueCard extends MaisonCard {
         const u = esc(o?.attributes?.unit_of_measurement || "");
         const dec = x.decimals !== null ? Math.max(0, Math.min(4, x.decimals)) : (hass.entities?.[x.id]?.display_precision ?? (xv !== null && xv % 1 ? (Math.abs(xv) < 10 ? 2 : Math.abs(xv) < 100 ? 1 : 0) : 0));
         const shown = xv !== null ? fmt(xv, dec) : v !== null ? esc(v) : "—";
-        if (x.max !== null) {
-          const lo = x.min ?? 0, span = x.max - lo || 1;
+        // échelle automatique : max des définitions Torque s'il existe, sinon arrondi au-dessus de la valeur (1, 2, 2,5 ou 5 × 10ⁿ)
+        const nice = (y) => { const m = Math.max(1e-9, Math.abs(y) * 1.2); const p = 10 ** Math.floor(Math.log10(m)); return [1, 2, 2.5, 5, 10].map((k) => k * p).find((k) => k >= m); };
+        const aMax = x.max ?? (x.gauge ? num(o?.attributes?.max) ?? (xv !== null && xv > 0 ? nice(xv) : 10) : null);
+        if (aMax !== null) {
+          const lo = x.min ?? (x.gauge ? num(o?.attributes?.min) : null) ?? 0, span = aMax - lo || 1;
           const sd = Math.abs(span) < 10 ? 1 : 0;
           xDial.push(dialHtml(this, { label, short: label, value: shown, unit: u, frac: xv === null ? null : (xv - lo) / span, color: "blue", id: x.id,
             scale: Array.from({ length: 6 }, (_, i) => fmt(lo + (span * i) / 5, sd)) }));
@@ -1496,12 +1500,83 @@ const LABELS = {
   show_battery: "Tension de la batterie BM6 du même nom",
 };
 
+/** Voitures Torque pour l'éditeur : nom de l'appareil et capteurs proposables (sans coordonnées GPS). */
+function tqEditorCars(c, hass) {
+  if (!hass) return [];
+  const reg = hass.entities || {}, devs = hass.devices || {};
+  const only = [].concat(c?.devices || []).map((x) => String(x).toLowerCase());
+  const cars = {};
+  for (const [id, e] of Object.entries(reg)) {
+    if (e.platform !== "torque_obd" || !e.device_id || domainOf(id) !== "sensor" || !hass.states[id]) continue;
+    const dev = devs[e.device_id];
+    const name = dev?.name_by_user || dev?.name || "Voiture";
+    if (only.length && !only.includes(name.toLowerCase()) && !only.includes(e.device_id)) continue;
+    const a = hass.states[id].attributes || {};
+    if (!a.pid || TQ_PRIVATE.has(tqPid(a.pid)) || /latitude|longitude/i.test(`${id} ${a.friendly_name || ""}`)) continue;
+    (cars[e.device_id] ||= { name, ids: [] }).ids.push(id);
+  }
+  return Object.values(cars).sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true }));
+}
+/** Ligne d'extras → capteur de la voiture (même règle que la carte). */
+function tqExtraId(raw, ids, hass) {
+  const want = String((raw && typeof raw === "object" ? raw.entity ?? raw.pid : raw) ?? "").trim();
+  if (!want) return null;
+  if (hass.states[want]) return want;
+  const low = want.toLowerCase();
+  return ids.find((x) => tqPid(hass.states[x]?.attributes?.pid) === tqPid(low))
+    || ids.find((x) => String(hass.states[x]?.attributes?.friendly_name || "").toLowerCase().includes(low)) || null;
+}
+const tqIsGauge = (raw) => !!raw && typeof raw === "object" && (raw.gauge === true || num(raw.max) !== null);
+function tqExtrasToForm(c, hass) {
+  const out = {};
+  const ex = c?.extras && typeof c.extras === "object" ? c.extras : {};
+  tqEditorCars(c, hass).forEach((v, i) => {
+    const key = Object.keys(ex).find((k) => k.toLowerCase() === v.name.toLowerCase());
+    const items = key ? [].concat(ex[key] || []) : [];
+    out[`xg_${i}`] = items.filter(tqIsGauge).map((x) => tqExtraId(x, v.ids, hass)).filter(Boolean);
+    out[`xt_${i}`] = items.filter((x) => !tqIsGauge(x)).map((x) => tqExtraId(x, v.ids, hass)).filter(Boolean);
+  });
+  return out;
+}
+function tqExtrasFromForm(v, old, hass) {
+  const cars = tqEditorCars(v, hass);
+  const ex = { ...(old?.extras && typeof old.extras === "object" ? old.extras : {}) };
+  let touched = false;
+  cars.forEach((car, i) => {
+    const g = v[`xg_${i}`], t = v[`xt_${i}`];
+    delete v[`xg_${i}`]; delete v[`xt_${i}`];
+    if (g === undefined && t === undefined) return;
+    touched = true;
+    const key = Object.keys(ex).find((k) => k.toLowerCase() === car.name.toLowerCase()) || car.name;
+    const prev = [].concat(ex[key] || []);
+    // réglages déjà écrits en YAML (nom, max, icône…) gardés pour un capteur resté dans la liste
+    const keep = (id) => prev.find((x) => tqExtraId(x, car.ids, hass) === id);
+    const gauges = [].concat(g || []).map((id) => { const o = keep(id); if (!o || typeof o !== "object") return { entity: id, gauge: true }; const { pid, ...r } = o; return { ...r, entity: id, ...(num(r.max) === null ? { gauge: true } : {}) }; });
+    const tiles = [].concat(t || []).filter((id) => ![].concat(g || []).includes(id)).map((id) => {
+      const o = keep(id);
+      if (!o || typeof o !== "object") return id;
+      const { max, min, gauge, pid, entity, ...rest } = o;
+      return Object.keys(rest).length ? { ...rest, entity: id } : id;
+    });
+    const all = [...gauges, ...tiles];
+    if (all.length) ex[key] = all; else delete ex[key];
+  });
+  for (const k of Object.keys(v)) if (/^x[gt]_\d+$/.test(k)) delete v[k];
+  if (touched) { if (Object.keys(ex).length) v.extras = ex; else delete v.extras; }
+  return v;
+}
+
 const EDITORS = {
   "voiture-electrique-card": [() => [T("name"), I("icon"), E("battery", "sensor"), E("range", "sensor"), E("odometer", "sensor"), E("charging"), E("plugged", "binary_sensor"),
     E("charger_power", "sensor"), E("climate", "climate"), E("lock", "lock"), E("location", "device_tracker"), T("prefix"), THEME_SELECT],
     "Tesla (Fleet, Teslemetry, Tessie, Tesla custom) est détectée seule. Pour une autre voiture électrique ou hybride rechargeable, choisissez au moins la batterie."],
-  "voiture-thermique-card": [() => [T("title"), I("icon"), { name: "devices", selector: { device: { integration: "torque_obd", multiple: true } } }, B("show_location"), B("show_battery"), THEME_SELECT],
-    "Les véhicules de l'intégration Torque OBD-II sont trouvés seuls, même si leurs capteurs ont été renommés. En route : vitesse, régime, température et consommation ; à l'arrêt : le dernier trajet. Un clic sur une voiture liste tous ses capteurs."],
+  "voiture-thermique-card": [(c, hass) => [T("title"), I("icon"), { name: "devices", selector: { device: { integration: "torque_obd", multiple: true } } }, B("show_location"), B("show_battery"), THEME_SELECT,
+    ...tqEditorCars(c, hass).map((v, i) => ({ type: "expandable", flatten: true, name: "", title: `Informations ajoutées · ${v.name}`, icon: "mdi:gauge", schema: [
+      { name: `xg_${i}`, label: "En cadran (échelle automatique, ou max en YAML)", selector: { entity: { multiple: true, include_entities: v.ids } } },
+      { name: `xt_${i}`, label: "En tuile", selector: { entity: { multiple: true, include_entities: v.ids } } },
+    ] }))],
+    "Les véhicules de l'intégration Torque OBD-II sont trouvés seuls, même si leurs capteurs ont été renommés. En route : vitesse, régime, température et consommation ; à l'arrêt : le dernier trajet. Un clic sur une voiture liste tous ses capteurs. Dans « Informations ajoutées », choisissez les capteurs à afficher en plus, en cadran ou en tuile.",
+    { toForm: tqExtrasToForm, fromForm: tqExtrasFromForm }],
   "voiture-batteries-card": [() => [T("title"), I("icon"), { name: "devices", selector: { device: { integration: "bm6", multiple: true } } }, N("volt_warn", 10, 14, 0.1), N("volt_alert", 10, 14, 0.1),
     N("hours", 6, 168), B("show_curve"), N("stale_hours", 0, 720), THEME_SELECT],
     "Les boîtiers BM6 (intégration Battery Monitor BM6) sont trouvés seuls. Au-dessus de 13,2 V, le moteur tourne ou la batterie est en charge. Un clic sur une batterie affiche son détail."],
@@ -1519,8 +1594,8 @@ if (typeof customElements !== "undefined") {
   const define = (name, cls) => { if (!customElements.get(name)) customElements.define(name, cls); };
   window.customCards = window.customCards || [];
   for (const [type, cls, name, description, stub, legacy] of CARDS) {
-    const [schemaFn, helper] = EDITORS[type];
-    const Ed = makeEditor(schemaFn, LABELS, cls.DEFAULTS || {}, helper);
+    const [schemaFn, helper, hooks] = EDITORS[type];
+    const Ed = makeEditor(schemaFn, LABELS, cls.DEFAULTS || {}, helper, hooks);
     cls.getConfigElement = () => document.createElement(`${type}-editor`);
     cls.getStubConfig = (hass) => stub(hass);
     define(type, cls);

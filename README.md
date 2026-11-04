@@ -124,7 +124,7 @@ batteries:
   Renault: sensor.batterie_laguna_tension
 ```
 
-Pour **ajouter des informations** à une voiture (puissance de l'alternateur, temps d'injection, couple…), listez-les sous son nom avec `extras`. Chaque ligne est un capteur, un PID Torque ou une partie du nom du capteur. Avec `max` (et `min`, `0` par défaut), l'information s'affiche en cadran ; sans, en tuile :
+Dans l'**éditeur visuel**, chaque voiture a une section « Informations ajoutées » : choisissez ses capteurs **en cadran** (échelle automatique) ou **en tuile**. En YAML, pour **ajouter des informations** à une voiture (puissance de l'alternateur, temps d'injection, couple…), listez-les sous son nom avec `extras`. Chaque ligne est un capteur, un PID Torque ou une partie du nom du capteur. Avec `max` (et `min`, `0` par défaut) ou `gauge: true` (échelle automatique), l'information s'affiche en cadran ; sinon, en tuile :
 
 ```yaml
 type: custom:voiture-thermique-card
