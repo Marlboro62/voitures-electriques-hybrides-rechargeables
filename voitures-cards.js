@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.2.0-beta.2";
+const CARD_VERSION = "0.2.0-beta.3";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -787,7 +787,7 @@ function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = fal
       o += `<line class="vd-ot${i % sub ? "" : " maj"}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"/>`;
     }
     scale.forEach((v, i) => {
-      const [x, y] = gPt(r - 13, a(i / n));
+      const [x, y] = gPt(r - 10.5, a(i / n));
       o += `<text class="vd-on" x="${x.toFixed(2)}" y="${(y + 2.6).toFixed(2)}">${esc(v)}</text>`;
     });
     out += `<g class="vd-o">${o}</g>`;
@@ -804,7 +804,7 @@ function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = fal
 const dialHtml = (card, { label, value, unit = "", frac, color = "blue", id = null, big = false, ticks = 0, red = null, low = null, needle = false, sub = "", scale = null, short = "" }) =>
   `<div class="vd-g${big ? " big" : ""}"${id ? card._click({ action: "more-info", entity: id }, null, label) : ""}>` +
   `<div class="vd-gw">${gaugeSvg(frac, color, { ticks, red, low, needle, scale })}<div class="vd-gv${needle ? " low" : ""}"><em class="vd-gt">${short || label}</em><b>${value}</b>${unit ? `<span>${unit}</span>` : ""}${sub ? `<small>${sub}</small>` : ""}</div></div>` +
-  `<div class="vd-gl">${label}</div></div>`;
+  `<div class="vd-gl"><span class="vd-gl-l">${label}</span><span class="vd-gl-s">${short || label}</span></div></div>`;
 
 /** Pastille d'information sous le tableau de bord. */
 const pillHtml = (card, icon, text, id, cls = "") =>
@@ -890,7 +890,8 @@ const DASH_STYLE = `
 .vd-pill.off { color: var(--m-muted); font-weight: 500; }
 .vd-none { font-size: .82rem; color: var(--m-muted); padding: 2px; }
 /* éléments propres au thème obd */
-.vd-o, .vd-gt { display: none; }
+.vd-o, .vd-gt, .vd-gl-s { display: none; }
+ha-card.th-obd .vd-gl-l { display: none; } ha-card.th-obd .vd-gl-s { display: inline; }
 ha-card.th-obd .vd-o { display: inline; }
 ha-card.th-obd .vd-gw { margin: 4px 0 11%; }
 ha-card.th-obd .vd-trk { stroke: #14181d; stroke-width: 9; stroke-linecap: butt; }
@@ -898,19 +899,23 @@ ha-card.th-obd .vd-val { stroke: var(--m-red) !important; stroke-width: 9; strok
 ha-card.th-obd .vd-red, ha-card.th-obd .vd-tick, ha-card.th-obd .vd-ndl, ha-card.th-obd .vd-hub { display: none; }
 ha-card.th-obd .vd-ot { stroke: var(--m-lcd); stroke-width: .8; opacity: .55; }
 ha-card.th-obd .vd-ot.maj { stroke-width: 1.4; opacity: 1; }
-ha-card.th-obd .vd-on { fill: var(--m-lcd); font-size: 7.5px; font-style: italic; text-anchor: middle; font-family: var(--m-lcd-font); }
+ha-card.th-obd .vd-on { fill: var(--m-lcd); font-size: 6.8px; font-style: italic; text-anchor: middle; font-family: var(--m-lcd-font); }
 ha-card.th-obd .vd-led { fill: var(--m-green); filter: drop-shadow(0 0 2px var(--m-green)); }
 ha-card.th-obd { --m-lcd-font: "DS-Digital", "Digital-7", "Orbitron", "Share Tech Mono", ui-monospace, "Consolas", monospace; }
 ha-card.th-obd .vd-gv, ha-card.th-obd .vd-gv.low { justify-content: center; padding: 6% 0 0; color: var(--m-lcd); font-family: var(--m-lcd-font); text-shadow: 0 0 6px rgba(76, 195, 255, .55); }
 ha-card.th-obd .vd-gv b { font-style: italic; font-weight: 600; letter-spacing: .02em; font-size: 1rem; }
-ha-card.th-obd .vd-g.big .vd-gv b { font-size: 1.9rem; }
+ha-card.th-obd .vd-g.big .vd-gv b { font-size: 1.6rem; }
+ha-card.th-obd .vd-g.big .vd-gv { padding-top: 10%; line-height: 1; }
 ha-card.th-obd .vd-g { container-type: inline-size; }
-@container (max-width: 120px) { ha-card.th-obd .vd-on { display: none; } ha-card.th-obd .vd-gv b { font-size: .9rem; } ha-card.th-obd .vd-gt { font-size: .48rem; } }
+ha-card.th-obd .vd-in { r: 25.5px; }
+@container (max-width: 120px) { ha-card.th-obd .vd-in { r: 30px; } ha-card.th-obd .vd-on { display: none; } ha-card.th-obd .vd-gt { display: none !important; } ha-card.th-obd .vd-gv { padding-top: 10%; } ha-card.th-obd .vd-gv b { font-size: .9rem; } ha-card.th-obd .vd-gt { font-size: .48rem; } }
 ha-card.th-obd .vd-gv span, ha-card.th-obd .vd-gv small { color: var(--m-lcd); font-style: italic; text-transform: uppercase; }
 ha-card.th-obd .vd-gt { display: block; font-style: italic; font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-ha-card.th-obd .vd-g.big .vd-gt { font-size: .62rem; }
+ha-card.th-obd .vd-g.big .vd-gt { font-size: .56rem; max-width: 34%; }
 ha-card.th-obd .vd-g:not(.big) .vd-gt { max-width: 50%; }
 ha-card.th-obd .vd-gl { display: none; }
+ha-card.th-obd .vd-g:not(.big) .vd-gl { display: block; margin-top: 5px; color: var(--m-lcd); font-family: var(--m-lcd-font); font-style: italic; text-transform: uppercase; font-size: .62rem; }
+ha-card.th-obd .vd-g:not(.big) .vd-gt { display: none; }
 ha-card.th-obd .vd-g:not(.big) .vd-gv span { font-size: .5rem; }
 ha-card.th-obd .vd-car { background: linear-gradient(180deg, #0d1115, #07090b); border-color: #1d242d; }
 ha-card.th-obd .vd-k, ha-card.th-obd .vd-pill { background: #07090c; border-color: #1d242d; }
