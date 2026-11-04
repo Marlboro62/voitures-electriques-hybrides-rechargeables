@@ -1,3 +1,31 @@
+<p>
+  ☕ <strong>Si cette carte vous est utile, vous pouvez soutenir le projet :</strong>
+</p>
+
+<div style="white-space: nowrap; line-height: 0;">
+  <a
+    href="https://www.buymeacoffee.com/Marlboro62"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="display: inline-block; text-decoration: none; vertical-align: middle;"
+  ><img
+    src="https://img.buymeacoffee.com/button-api/?text=Offrir%20un%20caf%C3%A9&emoji=%E2%98%95&slug=Marlboro62&button_colour=FF5F5F&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00"
+    alt="Offrir un café sur Buy Me a Coffee"
+    height="45"
+    style="display: block; border: 0;"
+  ></a>&nbsp;&nbsp;<a
+    href="https://ko-fi.com/M4M2QL45X"
+    target="_blank"
+    rel="noopener noreferrer"
+    style="display: inline-block; text-decoration: none; vertical-align: middle;"
+  ><img
+    src="https://storage.ko-fi.com/cdn/kofi6.png?v=6"
+    alt="Soutenir le projet sur Ko-fi"
+    height="45"
+    style="display: block; border: 0;"
+  ></a>
+</div>
+
 # Cartes Voitures
 
 Cartes Lovelace pour Home Assistant, dans un seul fichier, pour suivre ses voitures : **électriques**, **hybrides rechargeables** et **thermiques**, ainsi que leurs **batteries 12 V**.
@@ -20,9 +48,10 @@ Cartes Lovelace pour Home Assistant, dans un seul fichier, pour suivre ses voitu
 
 ### Avec HACS (recommandé)
 
-1. Dans HACS, menu **⋮** → **Dépôts personnalisés**.
-2. Ajoutez `https://github.com/Marlboro62/voitures-electriques-hybrides-rechargeables` avec le type **Tableau de bord** (Dashboard).
-3. Cherchez **Cartes Voitures**, installez, puis rechargez la page (Ctrl+F5).
+1. Dans HACS, cherchez **Cartes Voitures** et installez-les.
+2. Rechargez la page (Ctrl+F5).
+
+Si la carte n'apparaît pas encore dans la recherche de HACS, ajoutez le dépôt à la main : menu **⋮** → **Dépôts personnalisés**, adresse `https://github.com/Marlboro62/voitures-electriques-hybrides-rechargeables`, type **Tableau de bord** (Dashboard), puis cherchez **Cartes Voitures**.
 
 > Tant qu'il n'existe qu'une version bêta, activez **Afficher les versions bêta** dans la fenêtre de téléchargement de HACS.
 
