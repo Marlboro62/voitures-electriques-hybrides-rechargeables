@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0-beta";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -301,6 +301,7 @@ const themeClass = (theme, hass) => {
   if (theme === "v2") return "th-v2";
   if (theme === "auto") return dark ? "th-v2" : "th-v2 light";
   if (theme === "ha") return "th-ha";
+  if (theme === "obd") return "th-obd";
   return dark ? "th-maison dark" : "th-maison";
 };
 
@@ -351,6 +352,14 @@ ha-card.th-ha {
   --m-blue-dark: var(--primary-color, #03a9f4); --m-purple: #9c6ade; --m-brown: #a77a55; --m-acc: var(--accent-color, #ff9800);
   --m-radius: var(--ha-card-border-radius, 12px);
   border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, #e0e0e0));
+}
+/* obd : tableau de bord d'application OBD, cadrans noirs à lunette chromée, arc rouge, chiffres bleu cyan */
+ha-card.th-obd {
+  --m-card: #050608; --m-chip: #0b0e12; --m-text: #cfe8ff; --m-faint: #3b4a5c; --m-pop: #35b5ff; --m-on-pop: #02121f;
+  --m-green: #27d36c; --m-orange: #ff9a1f; --m-red: #ff2414; --m-yellow: #ffd23a; --m-blue: #35b5ff; --m-blue-dark: #1b6fb0;
+  --m-purple: #8c6be0; --m-brown: #a77a55; --m-acc: #35b5ff; --m-lime: #35b5ff; --m-lcd: #4cc3ff;
+  border: 1px solid #1a2028; --m-radius: 16px;
+  background: radial-gradient(120% 90% at 50% 0%, #11161c 0%, #050608 60%);
 }
 ha-card { --m-muted: color-mix(in srgb, var(--m-text) 62%, transparent); --m-line: color-mix(in srgb, var(--m-text) 12%, transparent); }
 ha-icon { --mdc-icon-size: 24px; display: inline-flex; }
@@ -635,6 +644,7 @@ const THEME_SELECT = {
         { value: "v2", label: "Style MyElectricalData (bleu nuit)" },
         { value: "auto", label: "Style MyElectricalData, clair ou sombre selon Home Assistant" },
         { value: "ha", label: "Thème Home Assistant" },
+        { value: "obd", label: "Tableau de bord OBD (cadrans noirs chromés, chiffres bleus)" },
       ],
     },
   },
@@ -746,14 +756,21 @@ const clamp01 = (x) => (x === null || !Number.isFinite(x) ? null : Math.max(0, M
 /** Couleurs des cadrans : uniquement des variables du thème (jamais une valeur de capteur). */
 const G_COLORS = { blue: "var(--m-pop)", green: "var(--m-green)", lime: "var(--m-lime, var(--m-green))", orange: "var(--m-orange)", red: "var(--m-red)", faint: "var(--m-faint)", yellow: "var(--m-yellow)" };
 
+/** Lunette chromée et cadran noir du thème obd (masqués dans les autres thèmes). */
+const OBD_BEZEL = `<defs><linearGradient id="vdChrome" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9eef3"/><stop offset=".35" stop-color="#6c7580"/>` +
+  `<stop offset=".55" stop-color="#20252b"/><stop offset=".8" stop-color="#8a939d"/><stop offset="1" stop-color="#d8dee4"/></linearGradient>` +
+  `<radialGradient id="vdFace" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#1d232a"/><stop offset=".7" stop-color="#0a0d10"/><stop offset="1" stop-color="#030405"/></radialGradient></defs>` +
+  `<g class="vd-o"><circle cx="60" cy="60" r="58.5" fill="url(#vdChrome)"/><circle cx="60" cy="60" r="55.5" fill="url(#vdFace)"/>` +
+  `<circle class="vd-in" cx="60" cy="60" r="30" fill="url(#vdFace)" stroke="url(#vdChrome)" stroke-width="2.6"/></g>`;
+
 /**
  * Cadran : arc de fond, zone rouge facultative, arc de valeur, graduations et aiguille facultatives.
  * frac, red (zone haute) et low (zone basse) sont des fractions (0 à 1) ; color est une clé de G_COLORS.
  */
-function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = false } = {}) {
+function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = false, scale = null } = {}) {
   const f = clamp01(frac);
   const r = 48, a = (x) => 135 + 270 * x;
-  let out = `<svg class="vd-arc" viewBox="0 0 120 104" aria-hidden="true"><path class="vd-trk" d="${gArc(r, 135, 405)}"/>`;
+  let out = `<svg class="vd-arc" viewBox="0 0 120 104" aria-hidden="true">${OBD_BEZEL}<path class="vd-trk" d="${gArc(r, 135, 405)}"/>`;
   if (red !== null) out += `<path class="vd-red" d="${gArc(r, a(clamp01(red)), 405)}"/>`;
   if (low !== null && clamp01(low) > 0) out += `<path class="vd-red" d="${gArc(r, 135, a(clamp01(low)))}"/>`;
   if (f !== null && f > 0.004) out += `<path class="vd-val" style="stroke:${G_COLORS[color] || G_COLORS.blue}" d="${gArc(r, 135, a(f))}"/>`;
@@ -762,6 +779,20 @@ function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = fal
     const [x0, y0] = gPt(r - 9, a(i / ticks)), [x1, y1] = gPt(r - (i % 2 ? 12 : 15), a(i / ticks));
     out += `<line class="vd-tick${i % 2 ? "" : " maj"}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"/>`;
   }
+  if (Array.isArray(scale) && scale.length > 1) {
+    let o = "";
+    const n = scale.length - 1, sub = n <= 6 ? 4 : 2;
+    for (let i = 0; i <= n * sub; i++) {
+      const [x0, y0] = gPt(r + 6, a(i / (n * sub))), [x1, y1] = gPt(r + (i % sub ? 8 : 9.5), a(i / (n * sub)));
+      o += `<line class="vd-ot${i % sub ? "" : " maj"}" x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"/>`;
+    }
+    scale.forEach((v, i) => {
+      const [x, y] = gPt(r - 13, a(i / n));
+      o += `<text class="vd-on" x="${x.toFixed(2)}" y="${(y + 2.6).toFixed(2)}">${esc(v)}</text>`;
+    });
+    out += `<g class="vd-o">${o}</g>`;
+  }
+  out += `<circle class="vd-o vd-led" cx="60" cy="103" r="2.4"/>`;
   if (needle && f !== null) {
     const [x, y] = gPt(r - 16, a(f));
     out += `<line class="vd-ndl" x1="60" y1="60" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}"/><circle class="vd-hub" cx="60" cy="60" r="4.5"/>`;
@@ -770,9 +801,9 @@ function gaugeSvg(frac, color, { ticks = 0, red = null, low = null, needle = fal
 }
 
 /** Cadran avec sa valeur au centre et son libellé : value et unit arrivent déjà formatés et échappés. */
-const dialHtml = (card, { label, value, unit = "", frac, color = "blue", id = null, big = false, ticks = 0, red = null, low = null, needle = false, sub = "" }) =>
+const dialHtml = (card, { label, value, unit = "", frac, color = "blue", id = null, big = false, ticks = 0, red = null, low = null, needle = false, sub = "", scale = null, short = "" }) =>
   `<div class="vd-g${big ? " big" : ""}"${id ? card._click({ action: "more-info", entity: id }, null, label) : ""}>` +
-  `<div class="vd-gw">${gaugeSvg(frac, color, { ticks, red, low, needle })}<div class="vd-gv${needle ? " low" : ""}"><b>${value}</b>${unit ? `<span>${unit}</span>` : ""}${sub ? `<small>${sub}</small>` : ""}</div></div>` +
+  `<div class="vd-gw">${gaugeSvg(frac, color, { ticks, red, low, needle, scale })}<div class="vd-gv${needle ? " low" : ""}"><em class="vd-gt">${short || label}</em><b>${value}</b>${unit ? `<span>${unit}</span>` : ""}${sub ? `<small>${sub}</small>` : ""}</div></div>` +
   `<div class="vd-gl">${label}</div></div>`;
 
 /** Pastille d'information sous le tableau de bord. */
@@ -858,7 +889,34 @@ const DASH_STYLE = `
 .vd-pill.odo { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .vd-pill.off { color: var(--m-muted); font-weight: 500; }
 .vd-none { font-size: .82rem; color: var(--m-muted); padding: 2px; }
+/* éléments propres au thème obd */
+.vd-o, .vd-gt { display: none; }
+ha-card.th-obd .vd-o { display: inline; }
+ha-card.th-obd .vd-gw { margin: 4px 0 11%; }
+ha-card.th-obd .vd-trk { stroke: #14181d; stroke-width: 9; stroke-linecap: butt; }
+ha-card.th-obd .vd-val { stroke: var(--m-red) !important; stroke-width: 9; stroke-linecap: butt; filter: drop-shadow(0 0 2px rgba(255, 36, 20, .85)); }
+ha-card.th-obd .vd-red, ha-card.th-obd .vd-tick, ha-card.th-obd .vd-ndl, ha-card.th-obd .vd-hub { display: none; }
+ha-card.th-obd .vd-ot { stroke: var(--m-lcd); stroke-width: .8; opacity: .55; }
+ha-card.th-obd .vd-ot.maj { stroke-width: 1.4; opacity: 1; }
+ha-card.th-obd .vd-on { fill: var(--m-lcd); font-size: 7.5px; font-style: italic; text-anchor: middle; font-family: var(--m-lcd-font); }
+ha-card.th-obd .vd-led { fill: var(--m-green); filter: drop-shadow(0 0 2px var(--m-green)); }
+ha-card.th-obd { --m-lcd-font: "DS-Digital", "Digital-7", "Orbitron", "Share Tech Mono", ui-monospace, "Consolas", monospace; }
+ha-card.th-obd .vd-gv, ha-card.th-obd .vd-gv.low { justify-content: center; padding: 6% 0 0; color: var(--m-lcd); font-family: var(--m-lcd-font); text-shadow: 0 0 6px rgba(76, 195, 255, .55); }
+ha-card.th-obd .vd-gv b { font-style: italic; font-weight: 600; letter-spacing: .02em; font-size: 1rem; }
+ha-card.th-obd .vd-g.big .vd-gv b { font-size: 1.9rem; }
+ha-card.th-obd .vd-g { container-type: inline-size; }
+@container (max-width: 120px) { ha-card.th-obd .vd-on { display: none; } ha-card.th-obd .vd-gv b { font-size: .9rem; } ha-card.th-obd .vd-gt { font-size: .48rem; } }
+ha-card.th-obd .vd-gv span, ha-card.th-obd .vd-gv small { color: var(--m-lcd); font-style: italic; text-transform: uppercase; }
+ha-card.th-obd .vd-gt { display: block; font-style: italic; font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ha-card.th-obd .vd-g.big .vd-gt { font-size: .62rem; }
+ha-card.th-obd .vd-g:not(.big) .vd-gt { max-width: 50%; }
+ha-card.th-obd .vd-gl { display: none; }
+ha-card.th-obd .vd-g:not(.big) .vd-gv span { font-size: .5rem; }
+ha-card.th-obd .vd-car { background: linear-gradient(180deg, #0d1115, #07090b); border-color: #1d242d; }
+ha-card.th-obd .vd-k, ha-card.th-obd .vd-pill { background: #07090c; border-color: #1d242d; }
+ha-card.th-obd .vd-k b { color: var(--m-lcd); font-family: var(--m-lcd-font); font-style: italic; text-shadow: 0 0 6px rgba(76, 195, 255, .45); }
 `;
+
 
 const levelBar = (v, hi = 60, lo = 35) => (v === null ? null : v >= hi ? "var(--m-green)" : v <= lo ? "var(--m-pop)" : "var(--m-orange)");
 
@@ -928,11 +986,11 @@ class MaisonVoitureCard extends MaisonCard {
     const rngU = esc(st[r.range]?.attributes?.unit_of_measurement || "km");
     const batColor = bat === null ? "faint" : ch.on ? "blue" : bat <= 20 ? "red" : bat <= 40 ? "orange" : "green";
     const big = dialHtml(this, { label: lim !== null ? `Batterie · limite ${fmt(lim)} %` : "Batterie", value: bat !== null ? fmt(bat) : "—", unit: "%",
-      sub: rng !== null ? `${fmt(rng)} ${rngU}` : "", frac: bat === null ? null : bat / 100, color: batColor, big: true, ticks: 10, low: 0.2, id: r.battery || r.range });
+      sub: rng !== null ? `${fmt(rng)} ${rngU}` : "", frac: bat === null ? null : bat / 100, color: batColor, big: true, ticks: 10, low: 0.2, id: r.battery || r.range, short: "Batterie", scale: [0, 20, 40, 60, 80, 100] });
     const side = [
-      rng !== null ? dialHtml(this, { label: "Autonomie", value: fmt(rng), unit: rngU, frac: bat === null ? null : bat / 100, color: batColor, id: r.range }) : "",
-      pwKw !== null && ch.on ? dialHtml(this, { label: "Puissance", value: fmt(pwKw, pwKw < 10 ? 1 : 0), unit: "kW", frac: pwKw / Math.max(11, num(c.max_power) || 11), color: "blue", id: r.power }) : "",
-      lim !== null ? dialHtml(this, { label: "Limite de charge", value: fmt(lim), unit: "%", frac: lim / 100, color: "faint", id: r.limit }) : "",
+      rng !== null ? dialHtml(this, { label: "Autonomie", short: "Auton.", value: fmt(rng), unit: rngU, frac: bat === null ? null : bat / 100, color: batColor, id: r.range }) : "",
+      pwKw !== null && ch.on ? dialHtml(this, { label: "Puissance", short: "Puiss.", value: fmt(pwKw, pwKw < 10 ? 1 : 0), unit: "kW", frac: pwKw / Math.max(11, num(c.max_power) || 11), color: "blue", id: r.power }) : "",
+      lim !== null ? dialHtml(this, { label: "Limite de charge", short: "Limite", value: fmt(lim), unit: "%", frac: lim / 100, color: "faint", id: r.limit }) : "",
     ].filter(Boolean).join("");
     let clim = "";
     const cl = r.climate ? st[r.climate] : null;
@@ -1269,14 +1327,16 @@ class MaisonTorqueCard extends MaisonCard {
       if (live) {
         const spd = n(r.speed) ?? n(r.gps_speed), rpm = n(r.rpm);
         const side = [
-          dialHtml(this, { label: "Régime", value: rpm !== null ? fmt(rpm / 1000, 1) : "—", unit: "×1000", frac: rpm === null ? null : rpm / maxRpm, color: rpm !== null && rpm > maxRpm * 0.75 ? "orange" : "lime", red: 0.8, id: r.rpm }),
-          dialHtml(this, { label: "Liquide", value: cool !== null ? fmt(cool) : "—", unit: "°C", frac: cool === null ? null : (cool - 40) / 90, color: temp(cool, 105), red: 65 / 90, id: r.coolant }),
-          oil !== null ? dialHtml(this, { label: "Huile", value: fmt(oil), unit: "°C", frac: (oil - 40) / 110, color: temp(oil, 130), red: 90 / 110, id: r.oil }) : "",
-          boost !== null ? dialHtml(this, { label: "Turbo", value: fmt(boost), unit: "mbar", frac: boost / 2500, color: "blue", id: r.boost })
-            : n(r.fuel) !== null ? dialHtml(this, { label: "Carburant", value: fmt(n(r.fuel)), unit: "%", frac: n(r.fuel) / 100, color: n(r.fuel) < 15 ? "red" : "blue", id: r.fuel })
-              : n(r.l100) !== null ? dialHtml(this, { label: "Consommation", value: fmt(n(r.l100), 1), unit: "L/100", frac: n(r.l100) / 20, color: n(r.l100) > 12 ? "orange" : "green", id: r.l100 }) : "",
+          dialHtml(this, { label: "Régime", value: rpm !== null ? fmt(rpm / 1000, 1) : "—", unit: "×1000", frac: rpm === null ? null : rpm / maxRpm, color: rpm !== null && rpm > maxRpm * 0.75 ? "orange" : "lime", red: 0.8, id: r.rpm, short: "Tours",
+            scale: Array.from({ length: Math.round(maxRpm / 1000) + 1 }, (_, i) => i) }),
+          dialHtml(this, { label: "Liquide", value: cool !== null ? fmt(cool) : "—", unit: "°C", frac: cool === null ? null : (cool - 40) / 90, color: temp(cool, 105), red: 65 / 90, id: r.coolant, short: "Eau", scale: [40, 70, 100, 130] }),
+          oil !== null ? dialHtml(this, { label: "Huile", value: fmt(oil), unit: "°C", frac: (oil - 40) / 110, color: temp(oil, 130), red: 90 / 110, id: r.oil, scale: [40, 95, 150] }) : "",
+          boost !== null ? dialHtml(this, { label: "Turbo", value: fmt(boost), unit: "mbar", frac: boost / 2500, color: "blue", id: r.boost, scale: [0, 0.5, 1, 1.5, 2, 2.5] })
+            : n(r.fuel) !== null ? dialHtml(this, { label: "Carburant", value: fmt(n(r.fuel)), unit: "%", frac: n(r.fuel) / 100, color: n(r.fuel) < 15 ? "red" : "blue", id: r.fuel, short: "Carbu", scale: [0, 25, 50, 75, 100] })
+              : n(r.l100) !== null ? dialHtml(this, { label: "Consommation", value: fmt(n(r.l100), 1), unit: "L/100", frac: n(r.l100) / 20, color: n(r.l100) > 12 ? "orange" : "green", id: r.l100, short: "Conso", scale: [0, 5, 10, 15, 20] }) : "",
         ].filter(Boolean).join("");
-        main = `<div class="vd-dash">${dialHtml(this, { label: gear !== null ? `Rapport ${gear ? fmt(gear) : "N"}` : "Vitesse", value: spd !== null ? fmt(spd) : "—", unit: "km/h", frac: spd === null ? null : spd / maxSpeed, color: "blue", big: true, ticks: 10, needle: true, id: r.speed || r.gps_speed })}<div class="vd-side">${side}</div></div>`;
+        main = `<div class="vd-dash">${dialHtml(this, { label: gear !== null ? `Rapport ${gear ? fmt(gear) : "N"}` : "Vitesse", value: spd !== null ? fmt(spd) : "—", unit: "km/h", frac: spd === null ? null : spd / maxSpeed, color: "blue", big: true, ticks: 10, needle: true, id: r.speed || r.gps_speed,
+          scale: Array.from({ length: 11 }, (_, i) => Math.round((maxSpeed * i) / 10)) })}<div class="vd-side">${side}</div></div>`;
       } else {
         // valeurs du trajet : Torque les remet à zéro en se reconnectant sans rouler, les zéros sont masqués
         // durée en secondes d'après l'unité du capteur (Home Assistant peut l'afficher en min ou h) ;

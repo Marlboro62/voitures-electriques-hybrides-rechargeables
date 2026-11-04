@@ -79,6 +79,7 @@ Toutes les cartes acceptent `theme` :
 | `maison` | Suit votre thème Home Assistant (clair ou sombre), avec des touches de couleur pastel |
 | `auto` | Style MyElectricalData, clair ou sombre selon Home Assistant |
 | `ha` | Couleurs du thème Home Assistant |
+| `obd` | Tableau de bord façon application OBD : cadrans noirs à lunette chromée, arc rouge, graduations et chiffres bleu cyan |
 
 ## Voiture électrique ou hybride rechargeable — `custom:voiture-electrique-card`
 
@@ -123,9 +124,9 @@ batteries:
   Renault: sensor.batterie_laguna_tension
 ```
 
-| Sombre, tous les capteurs | Clair |
-| --- | --- |
-| <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque.png" alt="Voitures Torque, détail" width="300"> | <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque-clair.png" alt="Voitures Torque, clair" width="300"> |
+| Sombre, tous les capteurs | Clair | Thème `obd` |
+| --- | --- | --- |
+| <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque.png" alt="Voitures Torque, détail" width="300"> | <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque-clair.png" alt="Voitures Torque, clair" width="300"> | <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque-obd.png" alt="Voitures Torque, thème obd" width="300"> |
 
 ## Batteries 12 V (BM6) — `custom:voiture-batteries-card`
 
