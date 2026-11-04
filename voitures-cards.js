@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.1.0-beta.2";
+const CARD_VERSION = "0.1.0-beta.3";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -1207,7 +1207,15 @@ class MaisonTorqueCard extends MaisonCard {
     for (const d of Object.values(map)) for (const [k, id] of Object.entries(d.fallback || {})) d.roles[k] ||= id;
     // batterie BM6 au nom du véhicule (« Batterie Renault » pour « Renault »)
     const bm = Object.entries(reg).filter(([id, e]) => ["bm6", "bm2", "bm7"].includes(e.platform) && hass.states[id]?.attributes?.device_class === "voltage");
+    // batteries choisies à la main : { Mercedes: "Batterie SLK" } (nom de l'appareil BM6) ou { Mercedes: sensor.… } (capteur de tension)
+    const chosen = Object.fromEntries(Object.entries(c.batteries && typeof c.batteries === "object" ? c.batteries : {}).map(([k, v]) => [String(k).toLowerCase(), String(v)]));
     for (const d of Object.values(map)) {
+      const want = chosen[d.name.toLowerCase()];
+      if (want) {
+        const byName = bm.find(([, e]) => String(devs[e.device_id]?.name_by_user || devs[e.device_id]?.name || "").toLowerCase() === want.toLowerCase());
+        const id = hass.states[want] ? want : byName?.[0];
+        if (id) { d.roles.battery = id; continue; }
+      }
       // « Batterie Renault » ↔ « Renault Laguna » : le nom de la batterie sans « Batterie » doit figurer dans celui de la voiture, ou l'inverse
       const car = d.name.toLowerCase();
       const hit = bm.find(([, e]) => {
@@ -1266,9 +1274,13 @@ class MaisonTorqueCard extends MaisonCard {
         main = `<div class="vd-dash">${dialHtml(this, { label: gear !== null ? `Rapport ${gear ? fmt(gear) : "N"}` : "Vitesse", value: spd !== null ? fmt(spd) : "—", unit: "km/h", frac: spd === null ? null : spd / maxSpeed, color: "blue", big: true, ticks: 10, needle: true, id: r.speed || r.gps_speed })}<div class="vd-side">${side}</div></div>`;
       } else {
         // valeurs du trajet : Torque les remet à zéro en se reconnectant sans rouler, les zéros sont masqués
-        const mov = pos(r.trip_moving) ?? pos(r.trip_time);
+        // durée en secondes d'après l'unité du capteur (Home Assistant peut l'afficher en min ou h) ;
+        // la plus longue des deux : le temps « en mouvement » repart parfois de zéro en cours de trajet
+        const secs = (id) => { const x = pos(id); if (x === null) return null; const u = String(st[id]?.attributes?.unit_of_measurement || "s").toLowerCase(); return u.startsWith("h") ? x * 3600 : u.startsWith("min") ? x * 60 : u === "ms" ? x / 1000 : x; };
+        const durs = [secs(r.trip_moving), secs(r.trip_time)].filter((x) => x !== null);
+        const mov = durs.length ? Math.max(...durs) : null;
         const km = pos(r.trip_km);
-        const trip = `${k("Dernier trajet", km !== null ? fmt(km, 1) : null, "km", r.trip_km)}${k("Durée", mov !== null ? hm(mov / 60) : null, "", r.trip_moving || r.trip_time)}` +
+        const trip = `${k("Dernier trajet", km !== null ? fmt(km, 1) : null, "km", r.trip_km)}${k("Durée", mov !== null ? (mov < 60 ? "< 1 min" : hm(mov / 60)) : null, "", r.trip_time || r.trip_moving)}` +
           `${k("Vitesse moy.", pos(r.trip_avg) !== null ? fmt(pos(r.trip_avg)) : null, "km/h", r.trip_avg)}${km !== null && pos(r.trip_l100) !== null ? k("Consommation", fmt(pos(r.trip_l100), 1), "L/100", r.trip_l100) : ""}`;
         main = trip ? `<div class="vd-trip">${trip}</div>` : `<div class="vd-none">Aucun trajet en mémoire : il s'affichera après le prochain parcours.</div>`;
       }

@@ -100,8 +100,8 @@ type: custom:voiture-thermique-card
 
 Les voitures de l'intégration [Torque OBD-II](https://github.com/Marlboro62/Home-Assistant-Torque-OBDII-2027) (application Torque Pro) sont trouvées seules. Chaque capteur est reconnu par sa clé Torque (attribut `pid`), même si l'entité a été renommée. Pour chaque voiture :
 
-- **en route** (Torque connecté) : vitesse, régime, température du liquide de refroidissement (rouge à partir de 105 °C) et consommation instantanée ;
-- **à l'arrêt** : le **dernier trajet** (distance, durée en mouvement, vitesse moyenne, consommation) et depuis quand ;
+- **en route** (Torque connecté) : un **compteur de vitesse** à aiguille (rapport engagé en dessous) et des **cadrans** pour le régime, le liquide de refroidissement (rouge à partir de 105 °C), l'huile et le turbo, le carburant ou la consommation ;
+- **à l'arrêt** : le **dernier trajet** (distance, durée, vitesse moyenne, consommation) et depuis quand ;
 - la **zone** (« À la maison », « Absente » ou le nom de la zone, jamais l'adresse ni la carte) ;
 - des pastilles : **voyant moteur** (distance parcourue voyant allumé, en rouge), **batterie** (tension du boîtier BM6 dont le nom contient celui de la voiture, ex. « Batterie Clio » pour « Clio »), **carburant**, **kilométrage** (PID propre au véhicule, ex. « Laguna - Kilométrage total ») et consommation moyenne.
 
@@ -110,11 +110,20 @@ Les voitures de l'intégration [Torque OBD-II](https://github.com/Marlboro62/Hom
 - Renault Laguna III (Mode 22) : kilométrage total (`k222006`), carburant dans le réservoir (`k222201`, sinon `k22287f`), température d'huile (`k222007`), puissance de l'alternateur, cumul des démarrages ; vitesse, régime, liquide de refroidissement et air d'admission (`k222001` à `k222003`, `k22240d`) servent de secours si les PID standard ne sont pas lus ;
 - Mercedes SLK R170 (bloc `21 01`) : température d'huile (`k2101_slktemp33`), pression de suralimentation (`k2101_slkpres29`) et rapport engagé (`k2101_slkgear`).
 
-En route, l'huile (rouge à partir de 130 °C), le turbo et le rapport s'ajoutent aux tuiles ; à l'arrêt, la dernière température d'huile apparaît en pastille.
+En route, l'huile (rouge à partir de 130 °C), le turbo et le rapport s'ajoutent au tableau de bord ; à l'arrêt, la dernière température d'huile apparaît en pastille.
 
 Un clic sur une voiture liste **tous ses capteurs** par ordre alphabétique, sauf les coordonnées GPS (latitude, longitude, altitude, cap), jamais affichées ; un appui long ouvre la fiche « Torque connecté ». À l'arrêt, les valeurs de trajet à zéro (Torque les remet à zéro quand il se reconnecte sans rouler) sont masquées.
 
-`devices` (vide = toutes), `show_location` (`true`), `show_battery` (`true`), `title`, `icon`.
+`devices` (vide = toutes), `show_location` (`true`), `show_battery` (`true`), `max_speed` (`200` km/h, fin du compteur), `max_rpm` (`7000` tr/min), `title`, `icon`.
+
+Quand le nom du boîtier BM6 ne reprend pas celui de la voiture, choisissez sa batterie à la main avec `batteries` (nom de l'appareil BM6, ou capteur de tension) :
+
+```yaml
+type: custom:voiture-thermique-card
+batteries:
+  Mercedes: Batterie SLK
+  Renault: sensor.batterie_laguna_tension
+```
 
 | Sombre, tous les capteurs | Clair |
 | --- | --- |
