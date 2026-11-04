@@ -216,6 +216,8 @@
       q("temperature_huile_moteur", "k222007", live ? 96 : 28, "°C", `${name} - Température huile moteur`);
       if (live) q("rapport_engage", "k2101_slkgear", 5, null, `${name} - Rapport engagé`);
       if (!live) q("carburant_dans_le_reservoir", "k222201", 21.5, "L", `${name} - Carburant dans le réservoir`);
+      q("puissance_alternateur", "k222805", live ? 980 : 400, "W", `${name} - Puissance alternateur`);
+      q("temperature_air_admission", "kf", live ? 31 : 24, "°C", "Température air admission");
     }
     const areas = {};
     const floors = {

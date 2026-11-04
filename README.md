@@ -124,6 +124,27 @@ batteries:
   Renault: sensor.batterie_laguna_tension
 ```
 
+Pour **ajouter des informations** à une voiture (puissance de l'alternateur, temps d'injection, couple…), listez-les sous son nom avec `extras`. Chaque ligne est un capteur, un PID Torque ou une partie du nom du capteur. Avec `max` (et `min`, `0` par défaut), l'information s'affiche en cadran ; sans, en tuile :
+
+```yaml
+type: custom:voiture-thermique-card
+extras:
+  Renault:
+    - entity: sensor.renault_laguna_puissance_alternateur
+      name: Alternateur
+      max: 1500
+    - pid: k222806            # PID Torque
+      name: Débit carburant
+    - Couple moteur effectif  # partie du nom du capteur
+    - entity: sensor.renault_couple_moteur
+      name: Couple
+      icon: mdi:engine
+      decimals: 0
+      when: live              # live (en route), parked (garée) ou always (défaut)
+```
+
+Les coordonnées GPS (latitude, longitude) ne sont jamais affichées, même ajoutées ici.
+
 | Sombre, tous les capteurs | Clair | Thème `obd` |
 | --- | --- | --- |
 | <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque.png" alt="Voitures Torque, détail" width="300"> | <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque-clair.png" alt="Voitures Torque, clair" width="300"> | <img src="https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/images/voitures-torque-obd.png" alt="Voitures Torque, thème obd" width="300"> |

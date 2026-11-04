@@ -142,7 +142,7 @@
   "use strict";
   const CASES = {
     electrique: { cards: [{ type: "custom:voiture-electrique-card", name: "Tesla" }] },
-    thermique: { cards: [{ type: "custom:voiture-thermique-card" }] },
+    thermique: { cards: [{ type: "custom:voiture-thermique-card", extras: { Clio: ["Température air admission", { pid: "k222805", name: "Alternateur", max: 1500 }], Kangoo: [{ entity: "sensor.tq_kangoo_puissance_alternateur", name: "Alternateur", max: 1500 }, { pid: "kf", name: "Air admission", icon: "mdi:thermometer" }, "Latitude GPS"] } }] },
     batteries: { cards: [{ type: "custom:voiture-batteries-card" }] },
   };
   const defaults = { card: "thermique", page: "dark", theme: "v2", width: "mobile", charging: "on" };

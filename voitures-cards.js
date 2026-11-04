@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.2.0-beta.4";
+const CARD_VERSION = "0.2.0-beta.5";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -893,6 +893,9 @@ const DASH_STYLE = `
 .vd-pill.odo { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .vd-pill.off { color: var(--m-muted); font-weight: 500; }
 .vd-none { font-size: .82rem; color: var(--m-muted); padding: 2px; }
+.vd-xd { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.vd-xd .vd-g { width: 100%; }
+.vd-k small ha-icon { --mdc-icon-size: 14px; margin-right: 4px; vertical-align: -2px; color: var(--m-muted); }
 /* éléments propres au thème obd */
 .vd-o, .vd-gt, .vd-gl-s { display: none; }
 ha-card.th-obd .vd-gl-l { display: none; } ha-card.th-obd .vd-gl-s { display: inline; }
@@ -1298,12 +1301,29 @@ class MaisonTorqueCard extends MaisonCard {
       }));
       if (hit) d.roles.battery = hit;
     }
+    // informations ajoutées à la main par véhicule : capteur, PID Torque ou partie du nom du capteur
+    const extras = Object.fromEntries(Object.entries(c.extras && typeof c.extras === "object" ? c.extras : {}).map(([k, v]) => [String(k).toLowerCase(), [].concat(v || [])]));
+    const isGps = (id) => /latitude|longitude|gps_lat|gps_lon/i.test(`${id} ${hass.states[id]?.attributes?.friendly_name || ""}`);
+    for (const d of Object.values(map)) {
+      d.extras = [];
+      for (const raw of extras[d.name.toLowerCase()] || []) {
+        const it = raw && typeof raw === "object" ? raw : { entity: raw };
+        const want = String(it.entity ?? it.pid ?? "").trim();
+        if (!want) continue;
+        const low = want.toLowerCase();
+        const id = hass.states[want] ? want
+          : d.all.find((x) => tqPid(hass.states[x]?.attributes?.pid) === tqPid(low))
+          || d.all.find((x) => String(hass.states[x]?.attributes?.friendly_name || "").toLowerCase().includes(low));
+        if (!id || isGps(id) || TQ_PRIVATE.has(tqPid(hass.states[id]?.attributes?.pid))) continue;
+        d.extras.push({ id, name: it.name, min: num(it.min), max: num(it.max), decimals: num(it.decimals), icon: it.icon, when: String(it.when || "always").toLowerCase() });
+      }
+    }
     const list = Object.values(map);
     list.sort((a, b) => (only.length ? only.indexOf(a.name.toLowerCase()) - only.indexOf(b.name.toLowerCase()) : 0) || a.name.localeCompare(b.name, "fr", { numeric: true }));
     return { list };
   }
 
-  _ids() { return this._resolved().list.flatMap((d) => Object.values(d.roles)); }
+  _ids() { return this._resolved().list.flatMap((d) => [...Object.values(d.roles), ...(d.extras || []).map((x) => x.id)]); }
 
   _render(c, hass) {
     const { list } = this._resolved();
@@ -1404,11 +1424,31 @@ class MaisonTorqueCard extends MaisonCard {
         }).filter(Boolean).sort((a, b) => a[0].localeCompare(b[0], "fr"));
         detail = `<div class="tel-d">${rows.map(([l, v, id]) => `<div class="tel-r"${this._click({ action: "more-info", entity: id }, null, l)}><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
       }
+      // informations ajoutées (extras) : cadran quand un maximum est donné, sinon tuile
+      const strip0 = new RegExp(`^${d.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+`, "i");
+      const xs = (d.extras || []).filter((x) => x.when === "always" || (x.when === "live") === live);
+      const xDial = [], xTile = [];
+      for (const x of xs) {
+        const o = st[x.id], v = val(x.id), xv = num(v);
+        const label = esc(x.name ?? String(o?.attributes?.friendly_name || x.id).replace(strip0, ""));
+        const u = esc(o?.attributes?.unit_of_measurement || "");
+        const dec = x.decimals !== null ? Math.max(0, Math.min(4, x.decimals)) : (hass.entities?.[x.id]?.display_precision ?? (xv !== null && xv % 1 ? (Math.abs(xv) < 10 ? 2 : Math.abs(xv) < 100 ? 1 : 0) : 0));
+        const shown = xv !== null ? fmt(xv, dec) : v !== null ? esc(v) : "—";
+        if (x.max !== null) {
+          const lo = x.min ?? 0, span = x.max - lo || 1;
+          const sd = Math.abs(span) < 10 ? 1 : 0;
+          xDial.push(dialHtml(this, { label, short: label, value: shown, unit: u, frac: xv === null ? null : (xv - lo) / span, color: "blue", id: x.id,
+            scale: Array.from({ length: 6 }, (_, i) => fmt(lo + (span * i) / 5, sd)) }));
+        } else {
+          xTile.push(`<div class="vd-k"${this._click({ action: "more-info", entity: x.id }, null, label)}><small>${x.icon ? `<ha-icon icon="${esc(x.icon)}"></ha-icon>` : ""}${label}</small><b>${shown}${u && xv !== null ? `<span>${u}</span>` : ""}</b></div>`);
+        }
+      }
+      const extra = (xDial.length ? `<div class="vd-xd">${xDial.join("")}</div>` : "") + (xTile.length ? `<div class="vd-trip">${xTile.join("")}</div>` : "");
       const stCls = milKm ? "alert" : live ? "live" : "ok";
       const head = carHead(live ? "mdi:car-sports" : "mdi:car", esc(d.name), esc(sub || "Pas encore de trajet"), milKm ? "Voyant" : live ? "En route" : "Garée", stCls,
         `<ha-icon class="vd-more" icon="${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`)
         .replace('<div class="vd-h">', `<div class="vd-h"${this._click({ action: "ui", set: { car: isOpen ? null : d.id } }, { action: "more-info", entity: r.connected || r.tracker }, d.name)}>`);
-      return `<div class="vd-car${isOpen ? " open" : ""}${milKm ? " alert" : live ? " live" : ""}">${head}${main}${pills ? `<div class="vd-pills">${pills}</div>` : ""}${detail}</div>`;
+      return `<div class="vd-car${isOpen ? " open" : ""}${milKm ? " alert" : live ? " live" : ""}">${head}${main}${extra}${pills ? `<div class="vd-pills">${pills}</div>` : ""}${detail}</div>`;
     }).join("");
     const sum = [driving ? `<span class="vd-st live"><i></i>${driving} en route</span>` : "", mil ? `<span class="vd-st alert"><i></i>${mil} voyant moteur</span>` : ""].join("");
     return `<div class="vd"><div class="vd-top"><ha-icon icon="${esc(c.icon || "mdi:car-multiple")}"></ha-icon><div class="vd-t"><div class="vd-ttl">${tpl(c.title ?? "Voitures", hass)}</div>` +
