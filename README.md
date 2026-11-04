@@ -79,7 +79,7 @@ Toutes les cartes acceptent `theme` :
 | `maison` | Suit votre thème Home Assistant (clair ou sombre), avec des touches de couleur pastel |
 | `auto` | Style MyElectricalData, clair ou sombre selon Home Assistant |
 | `ha` | Couleurs du thème Home Assistant |
-| `obd` | Tableau de bord façon application OBD : cadrans noirs à lunette chromée, arc rouge, graduations et chiffres bleu cyan |
+| `obd` | Tableau de bord façon application OBD : cadrans noirs à lunette chromée, arc rouge, graduations et chiffres bleu cyan ; voiture garée, le dernier trajet s'affiche aussi en cadrans |
 
 ## Voiture électrique ou hybride rechargeable — `custom:voiture-electrique-card`
 

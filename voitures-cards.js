@@ -11,7 +11,7 @@
  */
 
 (() => {
-const CARD_VERSION = "0.2.0-beta";
+const CARD_VERSION = "0.2.0-beta.2";
 
 /* ------------------------------------------------------------- utilitaires */
 
@@ -1347,7 +1347,26 @@ class MaisonTorqueCard extends MaisonCard {
         const km = pos(r.trip_km);
         const trip = `${k("Dernier trajet", km !== null ? fmt(km, 1) : null, "km", r.trip_km)}${k("Durée", mov !== null ? (mov < 60 ? "< 1 min" : hm(mov / 60)) : null, "", r.trip_time || r.trip_moving)}` +
           `${k("Vitesse moy.", pos(r.trip_avg) !== null ? fmt(pos(r.trip_avg)) : null, "km/h", r.trip_avg)}${km !== null && pos(r.trip_l100) !== null ? k("Consommation", fmt(pos(r.trip_l100), 1), "L/100", r.trip_l100) : ""}`;
-        main = trip ? `<div class="vd-trip">${trip}</div>` : `<div class="vd-none">Aucun trajet en mémoire : il s'affichera après le prochain parcours.</div>`;
+        const avg = pos(r.trip_avg), tl = km !== null ? pos(r.trip_l100) : null;
+        if (c.theme === "obd" && trip) {
+          // thème obd : le dernier trajet en cadrans ; échelle choisie selon la valeur
+          const top = (x, steps) => steps.find((m) => x <= m) ?? steps[steps.length - 1];
+          const sc = (m, n = 5) => Array.from({ length: n + 1 }, (_, i) => Math.round((m * i) / n));
+          const kmMax = km !== null ? top(km, [10, 25, 50, 100, 250, 500, 1000]) : 10;
+          const minMax = mov !== null ? top(mov / 60, [15, 30, 60, 120, 240, 480]) : 15;
+          const dAvg = (big) => dialHtml(this, { label: "Vitesse moyenne", short: "Moyenne", value: avg !== null ? fmt(avg) : "—", unit: "km/h", frac: avg === null ? null : avg / 150, id: r.trip_avg, big, ticks: big ? 10 : 0, scale: [0, 30, 60, 90, 120, 150] });
+          const side = [
+            km !== null ? dialHtml(this, { label: "Dernier trajet", short: "Trajet", value: fmt(km, 1), unit: "km", frac: km / kmMax, id: r.trip_km, scale: sc(kmMax) }) : "",
+            mov !== null ? dialHtml(this, { label: "Durée", short: "Durée", value: mov < 60 ? "< 1" : fmt(mov / 60), unit: "min", frac: mov / 60 / minMax, id: r.trip_time || r.trip_moving, scale: sc(minMax, 4) }) : "",
+            tl !== null && avg !== null ? dAvg(false) : "",
+          ].filter(Boolean).join("");
+          const big = tl !== null
+            ? dialHtml(this, { label: "Consommation du trajet", short: "Conso", value: fmt(tl, 1), unit: "L/100", frac: tl / 20, id: r.trip_l100, big: true, ticks: 10, scale: [0, 4, 8, 12, 16, 20] })
+            : avg !== null ? dAvg(true) : "";
+          main = big ? `<div class="vd-dash${side ? "" : " solo"}">${big}${side ? `<div class="vd-side">${side}</div>` : ""}</div>` : `<div class="vd-trip">${trip}</div>`;
+        } else {
+          main = trip ? `<div class="vd-trip">${trip}</div>` : `<div class="vd-none">Aucun trajet en mémoire : il s'affichera après le prochain parcours.</div>`;
+        }
       }
       const bat = c.show_battery !== false ? n(r.battery) : null;
       const pills = [
