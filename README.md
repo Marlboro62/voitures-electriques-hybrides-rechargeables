@@ -53,8 +53,6 @@ Cartes Lovelace pour Home Assistant, dans un seul fichier, pour suivre ses voitu
 
 Si la carte n'apparaît pas encore dans la recherche de HACS, ajoutez le dépôt à la main : menu **⋮** → **Dépôts personnalisés**, adresse `https://github.com/Marlboro62/voitures-electriques-hybrides-rechargeables`, type **Tableau de bord** (Dashboard), puis cherchez **Cartes Voitures**.
 
-> Tant qu'il n'existe qu'une version bêta, activez **Afficher les versions bêta** dans la fenêtre de téléchargement de HACS.
-
 ### Manuellement
 
 1. Téléchargez [`voitures-cards.js`](https://raw.githubusercontent.com/Marlboro62/voitures-electriques-hybrides-rechargeables/main/voitures-cards.js) (clic droit → Enregistrer sous) et copiez-le dans `/config/www/`.
