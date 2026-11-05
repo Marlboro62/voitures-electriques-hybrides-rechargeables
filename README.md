@@ -28,6 +28,9 @@
 
 # Cartes Voitures
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+[![Release](https://img.shields.io/github/v/release/Marlboro62/voitures-electriques-hybrides-rechargeables)](https://github.com/Marlboro62/voitures-electriques-hybrides-rechargeables/releases)
+
 Cartes Lovelace pour Home Assistant, dans un seul fichier, pour suivre ses voitures : **électriques**, **hybrides rechargeables** et **thermiques**, ainsi que leurs **batteries 12 V**.
 
 | Carte | Rôle | Trouvée seule avec |
